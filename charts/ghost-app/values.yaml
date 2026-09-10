@@ -1,0 +1,102 @@
+# yaml-language-server: $schema=values.schema.json
+#
+# ghost-app values.
+#
+# Everything the bjw-s common library understands (controllers, service,
+# persistence, configMaps, route, ...) is accepted at the top level exactly as
+# with bjw-s app-template; the library's own defaults apply. Reference:
+# https://bjw-s-labs.github.io/helm-charts/docs/app-template/
+#
+# Like upstream app-template, this file intentionally declares only the
+# options ghost-app adds. Upstream keeps its values.yaml empty for the same
+# reason: the library defaults are merged in at render time.
+
+# -- External Secrets injection. Replaces the k8s repo's
+# components/app-secrets and components/app-db-secrets Kustomize components.
+# Assumes External Secrets Operator and the referenced ClusterSecretStore
+# already exist in the cluster. Creating these resources does not mount or
+# inject anything into containers: map keys explicitly with env/envFrom/
+# persistence as before.
+secretsInjection:
+  # -- Master switch. Creates the `app-secrets` ExternalSecret -> Secret
+  # (every GCP secret labeled namespace=<release namespace>, one key each).
+  enabled: false
+  # -- Additionally create the `app-db-secrets` ExternalSecret -> Secret
+  # (Terraform's <env>-<app>db JSON secret exploded into host, port, user,
+  # password, database, uri, ssl_ca, ...). Only takes effect with enabled: true.
+  database: false
+  # -- How often ESO re-reads the backend.
+  refreshInterval: 5m
+  store:
+    # -- Name of the (Cluster)SecretStore to read from.
+    name: gcp-secrets-manager
+    # -- Kind of the store: ClusterSecretStore or SecretStore.
+    kind: ClusterSecretStore
+
+# -- Hot reload for PR previews. Adds a git-sync init container and sidecar
+# to one controller, a shared emptyDir workspace, and swaps the app
+# container's command for a file-watching dev runner. The image supplies
+# dependencies; git-sync supplies the PR's latest code. See README.
+hotReload:
+  enabled: false
+  # -- Controller (under `controllers`) to add git-sync to.
+  controller: main
+  # -- Container in that controller whose command/args are replaced.
+  container: main
+  # -- Git repository to sync (SSH form). Required when enabled.
+  repo: ""
+  # -- Git ref to follow, e.g. refs/pull/__PR_NUMBER__/head. Required when enabled.
+  ref: ""
+  # -- emptyDir mount path shared by git-sync and the app container.
+  workspace: /workspace
+  gitSync:
+    image:
+      repository: registry.k8s.io/git-sync/git-sync
+      tag: v4.4.2
+    # -- Polling interval for the sidecar.
+    period: 2s
+    # -- How long old worktrees are kept so the watcher can stop the old process.
+    staleWorktreeTimeout: 5m
+    depth: 1
+    # -- git-sync --root; the checkout is published at <root>/<link>.
+    root: /workspace/git
+    link: app
+    # -- git-sync runs as this uid/gid; the pod's fsGroup is set to gid so the
+    # mounted SSH key is readable.
+    uid: 65533
+    gid: 65533
+    # -- Extra args appended to both git-sync containers.
+    extraArgs: []
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        memory: 256Mi
+  ssh:
+    # -- Secret holding the read-only deploy key (by convention the
+    # app-secrets Secret created by secretsInjection).
+    secretName: app-secrets
+    # -- Key inside that Secret. Defaults to "<release name>-git-sync-ssh",
+    # which matches the Terraform argocd module's convention.
+    key: ""
+    # -- Pinned SSH host key(s) for the git host (GitHub's published Ed25519
+    # key), not a runtime keyscan.
+    # https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints
+    knownHosts: |
+      github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+  app:
+    # -- Entrypoint for the app container while hot reloading. The default
+    # runs the generated args script under tini.
+    command: [/sbin/tini, -g, --, sh, -ec]
+    # -- Args for the app container. Empty = generated script:
+    #   ln -sfn <nodeModules> <workspace>/node_modules
+    #   exec <devCommand> --legacy-watch --watch <checkout> --exec 'sh -c "cd <checkout> && exec <run>"'
+    # Set a non-empty list to take full control (command is used verbatim).
+    args: []
+    # -- Dev runner in the image (Scheduler: `pnpm dev` == nodemon).
+    devCommand: pnpm dev
+    # -- Command the runner (re)starts inside the synced checkout.
+    run: node src/main.js
+    # -- Dependencies directory baked into the image, symlinked into the workspace.
+    nodeModules: /app/node_modules

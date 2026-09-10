@@ -1,0 +1,87 @@
+{
+  "secretsInjection": {
+    "description": "External Secrets injection (app-secrets / app-db-secrets ExternalSecrets). Requires External Secrets Operator and the referenced store to exist.",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {"description": "Master switch: create the app-secrets ExternalSecret.", "type": "boolean", "default": false},
+      "database": {"description": "Also create the app-db-secrets ExternalSecret (only when enabled is true).", "type": "boolean", "default": false},
+      "refreshInterval": {"description": "ESO refresh interval for both ExternalSecrets.", "type": "string", "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h)$", "default": "5m"},
+      "store": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {"type": "string", "minLength": 1, "default": "gcp-secrets-manager"},
+          "kind": {"type": "string", "enum": ["ClusterSecretStore", "SecretStore"], "default": "ClusterSecretStore"}
+        },
+        "required": ["name", "kind"]
+      }
+    },
+    "required": ["enabled", "database", "store"]
+  },
+  "hotReload": {
+    "description": "git-sync based hot reload for PR previews.",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {"type": "boolean", "default": false},
+      "controller": {"type": "string", "minLength": 1, "default": "main"},
+      "container": {"type": "string", "minLength": 1, "default": "main"},
+      "repo": {"type": "string"},
+      "ref": {"type": "string"},
+      "workspace": {"type": "string", "pattern": "^/"},
+      "gitSync": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "image": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "repository": {"type": "string", "minLength": 1},
+              "tag": {"type": "string", "minLength": 1}
+            },
+            "required": ["repository", "tag"]
+          },
+          "period": {"type": "string", "pattern": "^[0-9]+(ms|s|m|h)$"},
+          "staleWorktreeTimeout": {"type": "string", "pattern": "^[0-9]+(ms|s|m|h)$"},
+          "depth": {"type": "integer", "minimum": 0},
+          "root": {"type": "string", "pattern": "^/"},
+          "link": {"type": "string", "minLength": 1},
+          "uid": {"type": "integer", "minimum": 0},
+          "gid": {"type": "integer", "minimum": 0},
+          "extraArgs": {"type": "array", "items": {"type": "string"}},
+          "resources": {"type": "object"}
+        }
+      },
+      "ssh": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "secretName": {"type": "string", "minLength": 1},
+          "key": {"type": "string"},
+          "knownHosts": {"type": "string", "minLength": 1}
+        }
+      },
+      "app": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "command": {"type": "array", "items": {"type": "string"}},
+          "args": {"type": "array", "items": {"type": "string"}},
+          "devCommand": {"type": "string", "minLength": 1},
+          "run": {"type": "string", "minLength": 1},
+          "nodeModules": {"type": "string", "pattern": "^/"}
+        }
+      }
+    },
+    "if": {"properties": {"enabled": {"const": true}}},
+    "then": {
+      "properties": {
+        "repo": {"minLength": 1},
+        "ref": {"minLength": 1}
+      },
+      "required": ["repo", "ref"]
+    }
+  }
+}

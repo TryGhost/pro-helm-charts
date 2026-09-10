@@ -1,0 +1,17 @@
+controllers:
+  main:
+    containers:
+      main:
+        resources:
+          requests:
+            cpu: 1
+            memory: 512Mi
+          limits:
+            cpu: 4
+            memory: 2Gi
+
+route:
+  main:
+    enabled: true
+    hostnames:
+      - scheduler.ghostinfra.com

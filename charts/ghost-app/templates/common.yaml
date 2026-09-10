@@ -1,0 +1,25 @@
+---
+{{- /*
+Rendering entry point, adapted from bjw-s app-template 5.1.0
+(templates/common.yaml, Apache-2.0). ghost-app adds two value fragments
+before handing off to the common library:
+  - the app-template default of nameOverride = release name
+  - the hot-reload git-sync sidecar/init container and mounts (hotReload.*)
+*/ -}}
+{{- include "bjw-s.common.loader.init" . }}
+
+{{- define "ghost-app.hardcodedValues" -}}
+# Set the nameOverride based on the release name if no override has been set
+{{ if not .Values.global.nameOverride }}
+global:
+  nameOverride: "{{ .Release.Name }}"
+{{ end }}
+{{- end -}}
+{{- $_ := mergeOverwrite .Values (include "ghost-app.hardcodedValues" . | fromYaml) -}}
+
+{{- if .Values.hotReload.enabled }}
+{{- $_ := mergeOverwrite .Values (include "ghost-app.hotReload.values" . | fromYaml) -}}
+{{- end }}
+
+{{/* Render the templates */}}
+{{ include "bjw-s.common.loader.generate" . }}

@@ -1,0 +1,11 @@
+.DS_Store
+.git/
+.gitignore
+*.swp
+*.bak
+*.tmp
+*~
+.idea/
+.vscode/
+# Schema fragment merged into values.schema.json (see README)
+schemas/

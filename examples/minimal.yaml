@@ -1,0 +1,15 @@
+# Smallest useful ghost-app release: one Deployment + Service, no secret
+# injection, no hot reload. Plain bjw-s values.
+controllers:
+  main:
+    containers:
+      main:
+        image:
+          repository: nginx
+          tag: 1.27.0
+service:
+  main:
+    controller: main
+    ports:
+      http:
+        port: 80

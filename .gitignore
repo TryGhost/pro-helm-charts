@@ -1,0 +1,7 @@
+# Downloaded dependency archives (helm dependency build/update). Chart.lock is
+# committed; the archives are re-fetched from it.
+charts/*/charts/
+# Local helm packaging output
+*.tgz
+.cr-release-packages/
+.DS_Store

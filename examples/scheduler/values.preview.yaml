@@ -1,0 +1,49 @@
+# Point the app and its migrations at the per-PR database (name assembled
+# from the namespace + the pull-request label the ApplicationSet stamps).
+# Credentials stay the cluster user from app-db-secrets — only the database
+# name differs from staging. Env renders alphabetically, so APP_NAME/
+# PR_NUMBER (uppercase sorts first) are defined before the $() expansion
+# that references them.
+controllers:
+  main:
+    containers:
+      main:
+        env: &previewDb
+          APP_NAME:
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          PR_NUMBER:
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.labels['pull-request']
+          db__connection__database: $(APP_NAME)_preview_$(PR_NUMBER)
+        resources:
+          requests:
+            cpu: 250m
+            memory: 256Mi
+          limits:
+            cpu: 1
+            memory: 1Gi
+    initContainers:
+      migrate:
+        env: *previewDb
+
+# gitops-sync substitutes __PR_NUMBER__ when snapshotting the preview branch;
+# the staging cluster's wildcard *.ghostinfra.net cert covers the host and
+# external-dns publishes it against the shared internal gateway's LB.
+route:
+  main:
+    enabled: true
+    hostnames:
+      - scheduler-__PR_NUMBER__.ghostinfra.net
+
+# Hot reload: replaces values.hot-reload.yaml. The chart adds the git-sync
+# init container + sidecar, the /workspace emptyDir, the pinned known_hosts
+# ConfigMap and the SSH-key-only Secret projection, and runs `pnpm dev`
+# (nodemon, --legacy-watch) against the synced checkout. gitops-sync still
+# substitutes __PR_NUMBER__ when snapshotting the preview branch.
+hotReload:
+  enabled: true
+  repo: git@github.com:TryGhost/Scheduler.git
+  ref: refs/pull/__PR_NUMBER__/head

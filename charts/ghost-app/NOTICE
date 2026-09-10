@@ -1,0 +1,15 @@
+ghost-app
+Copyright (c) Ghost Foundation
+
+This chart depends on, and is derived in part from, the bjw-s-labs helm-charts
+project (https://github.com/bjw-s-labs/helm-charts), licensed under the
+Apache License, Version 2.0:
+
+  - charts/library/common is consumed unmodified as the packaged "common"
+    dependency (see Chart.yaml / Chart.lock).
+  - templates/common.yaml adapts the rendering entry point of
+    charts/other/app-template (version 5.1.0).
+  - values.schema.json embeds the common library's values.schema.json and
+    extends it with this chart's own options.
+
+The upstream LICENSE is included as LICENSE.upstream.

@@ -1,0 +1,30 @@
+apiVersion: v2
+name: ghost-app
+description: >-
+  Ghost's application chart: the bjw-s common library plus optional External
+  Secrets injection (app-secrets / app-db-secrets) and git-sync hot reload for
+  PR previews. A drop-in replacement for bjw-s app-template.
+type: application
+# Bump on every releasable change (CI enforces this and releases are immutable).
+version: 0.1.0
+kubeVersion: ">=1.28.0-0"
+keywords:
+  - ghost
+  - app-template
+  - external-secrets
+  - git-sync
+home: https://github.com/TryGhost/pro-helm-charts
+sources:
+  - https://github.com/TryGhost/pro-helm-charts
+  - https://github.com/bjw-s-labs/helm-charts
+maintainers:
+  - name: Ghost Foundation
+    url: https://github.com/TryGhost
+dependencies:
+  - name: common
+    repository: https://bjw-s-labs.github.io/helm-charts
+    version: 5.1.0
+annotations:
+  # The rendering entry point is adapted from bjw-s app-template 5.1.0
+  # (Apache-2.0, https://github.com/bjw-s-labs/helm-charts). See NOTICE.
+  artifacthub.io/license: Apache-2.0
