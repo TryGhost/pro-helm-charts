@@ -4,6 +4,36 @@ entries:
   - annotations:
       artifacthub.io/license: Apache-2.0
     apiVersion: v2
+    created: "2026-09-10T15:53:54.446506524Z"
+    dependencies:
+    - name: common
+      repository: https://bjw-s-labs.github.io/helm-charts
+      version: 5.1.0
+    description: 'Ghost''s application chart: the bjw-s common library plus optional
+      External Secrets injection (app-secrets / app-db-secrets) and git-sync hot reload
+      for PR previews. A drop-in replacement for bjw-s app-template.'
+    digest: d3b2ad046d14804cf06059601398e09bc5975b6b10b88f4f4ddb9b0b3ef16d22
+    home: https://github.com/TryGhost/pro-helm-charts
+    keywords:
+    - ghost
+    - app-template
+    - external-secrets
+    - git-sync
+    kubeVersion: '>=1.28.0-0'
+    maintainers:
+    - name: Ghost Foundation
+      url: https://github.com/TryGhost
+    name: ghost-app
+    sources:
+    - https://github.com/TryGhost/pro-helm-charts
+    - https://github.com/bjw-s-labs/helm-charts
+    type: application
+    urls:
+    - https://github.com/TryGhost/pro-helm-charts/releases/download/ghost-app-0.2.0/ghost-app-0.2.0.tgz
+    version: 0.2.0
+  - annotations:
+      artifacthub.io/license: Apache-2.0
+    apiVersion: v2
     created: "2026-09-10T15:25:58.757261019Z"
     dependencies:
     - name: common
@@ -61,4 +91,4 @@ entries:
     urls:
     - https://github.com/TryGhost/pro-helm-charts/releases/download/ghost-app-0.1.2/ghost-app-0.1.2.tgz
     version: 0.1.2
-generated: "2026-09-10T15:25:58.747697401Z"
+generated: "2026-09-10T15:53:54.438460629Z"
