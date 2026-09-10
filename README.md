@@ -1,9 +1,8 @@
 # pro-helm-charts
 
 Ghost's Helm charts, published from this repository to the GitHub Pages
-Helm repository `https://tryghost.github.io/pro-helm-charts` via
-[chart-releaser](https://github.com/helm/chart-releaser). ArgoCD and `helm`
-fetch it anonymously.
+Helm repository `https://tryghost.github.io/pro-helm-charts`. ArgoCD and
+`helm` fetch it anonymously.
 
 | Chart | What it is |
 |---|---|
@@ -113,7 +112,7 @@ and reaches `app-secrets` through `secretsInjection`, so hot reload needs
 helmCharts:
   - name: ghost-app
     repo: https://tryghost.github.io/pro-helm-charts
-    version: 0.1.1
+    version: 0.1.2
     releaseName: myapp
     namespace: myapp
     valuesFile: ../../base/values.yaml
@@ -125,8 +124,8 @@ or plain Helm:
 
 ```sh
 helm repo add ghost https://tryghost.github.io/pro-helm-charts
-helm install myapp ghost/ghost-app --version 0.1.1 -n myapp -f values.yaml
-helm show values ghost/ghost-app --version 0.1.1
+helm install myapp ghost/ghost-app --version 0.1.2 -n myapp -f values.yaml
+helm show values ghost/ghost-app --version 0.1.2
 ```
 
 Every published release bundles the `common` version from its `Chart.lock`, so
@@ -190,15 +189,20 @@ overwritten. Every releasable change to `charts/ghost-app` therefore needs a
 new `version` in `Chart.yaml` (semver: patch for fixes, minor for backwards
 compatible additions, major when values or rendered resources change
 incompatibly). CI blocks PRs that change the chart without a bump or reuse a
-released version; chart-releaser runs with `skip_existing` as a second guard.
+released version; the release job skips versions that already have a GitHub
+release as a second guard. The repository also has GitHub's *immutable
+releases* enabled, so a published release and its `.tgz` cannot be altered.
 
 Merging to `main` with a chart change runs `.github/workflows/release.yaml`:
-validate, `helm dependency build` (bundling the locked common), then
-`helm/chart-releaser-action`, which creates the GitHub release and tag
-`ghost-app-<version>` with the `.tgz` attached and merges the entry into
-`index.yaml` on the `gh-pages` branch. Old entries are kept, so apps can keep
-pinning older versions. Only `GITHUB_TOKEN` is used (`contents: write` at job
-level); no PAT or extra secret.
+validate, `helm dependency build` (bundling the locked common),
+`helm package`, `gh release create ghost-app-<version>` with the `.tgz`
+attached, and `helm repo index --merge` to add the entry to `index.yaml` on the
+`gh-pages` branch, pointing at the release asset. Old entries are kept, so apps
+can keep pinning older versions. Only `GITHUB_TOKEN` is used
+(`contents: write` at job level); no PAT or extra secret.
+`helm/chart-releaser` is deliberately not used: it uploads the asset after
+creating the release, which immutable releases reject (that is how the empty
+`ghost-app-0.1.1` release came to exist).
 
 ### Publishing the first release (one-time setup)
 

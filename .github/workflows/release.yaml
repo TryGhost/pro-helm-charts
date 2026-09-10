@@ -1,13 +1,16 @@
 # Package and publish charts to the GitHub Pages Helm repository
-# (https://tryghost.github.io/pro-helm-charts) with helm/chart-releaser.
+# https://tryghost.github.io/pro-helm-charts
 #
-# Trigger: a push to main that touches charts/**. chart-releaser diffs
-# charts/ against the latest release tag, packages every chart whose
-# directory changed, creates a GitHub release + tag <chart>-<version> with the
-# .tgz attached, and rewrites index.yaml on the gh-pages branch, keeping
-# every previous entry. `skip_existing` means an already-released version is
-# never overwritten; validate.yaml's version-bump job blocks PRs that would
-# try.
+# Trigger: a push to main that touches charts/**. For every chart whose
+# Chart.yaml version has no GitHub release yet, this job bundles the locked
+# dependencies, packages, creates the release <chart>-<version> with the .tgz
+# attached (assets are uploaded at creation, so this works with GitHub's
+# immutable releases), and merges the entry into index.yaml on gh-pages,
+# pointing at the release asset. Released versions are skipped, never
+# overwritten (validate.yaml's version-bump job blocks PRs that would try).
+#
+# helm/chart-releaser is not used: it uploads assets after creating the
+# release, which immutable releases reject.
 #
 # The gh-pages push uses GITHUB_TOKEN, so it triggers no further Actions
 # workflows. GitHub's own Pages build (pages-build-deployment) is not an
@@ -44,11 +47,9 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     permissions:
-      contents: write # create the release and its tag, push gh-pages
+      contents: write # create releases and tags, push gh-pages
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0 # chart-releaser diffs against the latest tag
 
       - name: Configure git
         run: |
@@ -56,8 +57,6 @@ jobs:
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
       - name: Ensure the gh-pages branch exists
-        # chart-releaser pushes index.yaml to gh-pages and fails if the branch
-        # is missing. Create an empty orphan branch on first run.
         run: |
           if git ls-remote --exit-code --heads origin gh-pages >/dev/null; then
             echo "gh-pages exists"; exit 0
@@ -71,22 +70,44 @@ jobs:
         with:
           version: ${{ env.HELM_VERSION }}
 
-      - name: Bundle the locked common dependency
-        # helm package includes charts/*.tgz, so each release ships the exact
-        # common version from Chart.lock and apps never need the bjw-s repo.
-        run: |
-          helm repo add bjw-s https://bjw-s-labs.github.io/helm-charts
-          for chart in charts/*/; do
-            helm dependency build "$chart"
-          done
-
-      - name: Run chart-releaser
-        uses: helm/chart-releaser-action@cae68fefc6b5f367a0275617c9f83181ba54714f # v1.7.0
-        with:
-          charts_dir: charts
-          pages_branch: gh-pages
-          skip_existing: true
-          mark_as_latest: true
+      - name: Package and release unreleased chart versions
         env:
-          CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CR_GENERATE_RELEASE_NOTES: "true"
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          helm repo add bjw-s https://bjw-s-labs.github.io/helm-charts
+          git fetch --depth=1 origin gh-pages
+          git worktree add gh-pages origin/gh-pages
+          [ -f gh-pages/index.yaml ] || printf 'apiVersion: v1\nentries: {}\n' > gh-pages/index.yaml
+          released=()
+          for dir in charts/*/; do
+            name=$(yq '.name' "$dir/Chart.yaml")
+            version=$(yq '.version' "$dir/Chart.yaml")
+            tag="$name-$version"
+            if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              echo "$tag already released, skipping (releases are immutable)"
+              continue
+            fi
+            # Bundle the exact dependency versions from Chart.lock so consumers
+            # never need the bjw-s repository.
+            helm dependency build "$dir"
+            pkgdir=".cr-release-packages/$name"
+            mkdir -p "$pkgdir"
+            helm package "$dir" --destination "$pkgdir"
+            gh release create "$tag" "$pkgdir/$tag.tgz" \
+              --repo "$GITHUB_REPOSITORY" --title "$tag" --generate-notes
+            # Merge the new entry into index.yaml; the download URL is the release asset.
+            helm repo index "$pkgdir" \
+              --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$tag" \
+              --merge gh-pages/index.yaml
+            cp "$pkgdir/index.yaml" gh-pages/index.yaml
+            released+=("$tag")
+          done
+          if [ ${#released[@]} -eq 0 ]; then
+            echo "nothing to release"; exit 0
+          fi
+          cd gh-pages
+          git add index.yaml
+          git commit -m "Release ${released[*]}"
+          git push origin HEAD:gh-pages
+          echo "published: ${released[*]}"
