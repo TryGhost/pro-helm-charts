@@ -1,0 +1,41 @@
+{{- /*
+Replaces the k8s repo's components/db-previews drop-preview-db Job.
+Drops the preview's database when ArgoCD deletes the preview Application
+(PR closed / pr-preview label removed). Runs after the app's resources are
+gone.
+*/ -}}
+{{- if .Values.previewDatabase.enabled }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "ghost-app.previewDatabase.jobName" (dict "Release" .Release "suffix" "drop-preview-db") }}
+  labels:
+    {{- include "ghost-app.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/hook: PostDelete
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  backoffLimit: {{ .Values.previewDatabase.backoffLimit }}
+  ttlSecondsAfterFinished: {{ .Values.previewDatabase.ttlSecondsAfterFinished }}
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: drop
+          image: {{ include "ghost-app.previewDatabase.image" . }}
+          {{- with .Values.previewDatabase.resources }}
+          resources: {{ toJson . }}
+          {{- end }}
+          env:
+            {{- include "ghost-app.previewDatabase.env" . | nindent 12 }}
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              case "$PR_NUMBER" in '' | *[!0-9]*) echo "refusing to drop: bad PR_NUMBER '$PR_NUMBER'" >&2; exit 1;; esac
+              mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASS" \
+                -e "DROP DATABASE IF EXISTS \`${APP_NAME}_preview_${PR_NUMBER}\`"
+              echo "dropped ${APP_NAME}_preview_${PR_NUMBER}"
+{{- end }}

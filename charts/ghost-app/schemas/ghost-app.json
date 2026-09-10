@@ -196,5 +196,75 @@
         "minLength": 1
       }
     }
+  },
+  "previewDatabase": {
+    "description": "Per-PR preview database: create (wave 0) and drop (PostDelete hook) Jobs against the app's managed MySQL.",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {
+        "type": "boolean",
+        "default": false
+      },
+      "image": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "repository": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tag": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "repository",
+          "tag"
+        ]
+      },
+      "secretName": {
+        "type": "string",
+        "minLength": 1
+      },
+      "keys": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "host": {
+            "type": "string",
+            "minLength": 1
+          },
+          "port": {
+            "type": "string",
+            "minLength": 1
+          },
+          "user": {
+            "type": "string",
+            "minLength": 1
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "pullRequestLabel": {
+        "type": "string",
+        "minLength": 1
+      },
+      "backoffLimit": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "ttlSecondsAfterFinished": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "resources": {
+        "type": "object"
+      }
+    }
   }
 }

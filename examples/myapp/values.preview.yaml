@@ -47,3 +47,8 @@ route:
 # label on every preview pod.
 hotReload:
   enabled: true
+
+# Per-PR database: replaces the k8s repo's components/db-previews component.
+# Creates myapp_preview_<pr> in wave 0 and drops it on Application delete.
+previewDatabase:
+  enabled: true

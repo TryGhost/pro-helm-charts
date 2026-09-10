@@ -44,7 +44,7 @@ jobs:
             | jq --slurpfile ext "$CHART/schemas/ghost-app.json" '
                 .["$id"] = "https://github.com/TryGhost/pro-helm-charts/blob/main/charts/ghost-app/values.schema.json"
                 | .title = "ghost-app values"
-                | .description = "bjw-s common library values (embedded verbatim from the locked common dependency) plus the options ghost-app adds: secretsInjection and hotReload."
+                | .description = "bjw-s common library values (embedded verbatim from the locked common dependency) plus the options ghost-app adds: secretsInjection, hotReload and previewDatabase."
                 | .properties += $ext[0]' > /tmp/expected.schema.json
           if ! diff -q /tmp/expected.schema.json "$CHART/values.schema.json"; then
             echo "::error::values.schema.json is stale. Regenerate it with the command in README.md (Updating common) and commit." >&2
@@ -69,6 +69,8 @@ jobs:
           ! helm template t "$CHART" -f examples/minimal.yaml --set secretsInjection.store.kind=Nope
           ! helm template t "$CHART" -f examples/minimal.yaml --set hotReload.enabled=true --set hotReload.controller=nope  # unknown controller
           ! helm template t "$CHART" -f examples/minimal.yaml --set controllers.main.bogus=1  # bjw-s schema still applies
+          ! helm template t "$CHART" -f examples/minimal.yaml --set previewDatabase.bogus=1
+          ! helm template t "$CHART" -f examples/minimal.yaml --set previewDatabase.backoffLimit=-1
 
       - name: Render examples
         run: |
@@ -176,6 +178,49 @@ jobs:
           [ "$(yq '.env[] | select(.name=="db__connection__database") | .value' <<<"$main")" = '$(APP_NAME)_preview_$(PR_NUMBER)' ]
           [ "$(yq -N 'select(.kind=="ConfigMap") | .metadata.name' "$f" | sort | tr '\n' ' ')" = "myapp-config myapp-git-sync-hosts " ]
           [ "$(yq 'select(.kind=="HTTPRoute") | .spec.hostnames[0]' "$f")" = "myapp-__PR_NUMBER__.ghostinfra.net" ]
+
+      - name: Check preview database rendering
+        run: |
+          set -euo pipefail
+          echo "disabled by default: no Jobs in minimal, staging or production"
+          for f in out/minimal.yaml out/app-db-secrets.yaml out/myapp-staging.yaml out/myapp-production.yaml; do
+            ! grep -q 'kind: Job' "$f"
+          done
+
+          echo "preview: create + drop Jobs"
+          f=out/myapp-preview.yaml
+          [ "$(yq -N 'select(.kind=="Job") | .metadata.name' "$f" | sort | tr '\n' ' ')" = "myapp-create-preview-db myapp-drop-preview-db " ]
+          create=$(yq 'select(.kind=="Job" and .metadata.name=="myapp-create-preview-db")' "$f")
+          drop=$(yq 'select(.kind=="Job" and .metadata.name=="myapp-drop-preview-db")' "$f")
+          echo "create: wave 0, Force+Replace, not a hook"
+          [ "$(yq '.metadata.annotations["argocd.argoproj.io/sync-wave"]' <<<"$create")" = "0" ]
+          [ "$(yq '.metadata.annotations["argocd.argoproj.io/sync-options"]' <<<"$create")" = "Force=true,Replace=true" ]
+          [ "$(yq '.metadata.annotations["argocd.argoproj.io/hook"]' <<<"$create")" = "null" ]
+          echo "drop: PostDelete hook, deleted on success"
+          [ "$(yq '.metadata.annotations["argocd.argoproj.io/hook"]' <<<"$drop")" = "PostDelete" ]
+          [ "$(yq '.metadata.annotations["argocd.argoproj.io/hook-delete-policy"]' <<<"$drop")" = "HookSucceeded" ]
+          [ "$(yq '.metadata.annotations["argocd.argoproj.io/sync-wave"]' <<<"$drop")" = "null" ]
+          for job in "$create" "$drop"; do
+            [ "$(yq '.spec.backoffLimit' <<<"$job")" = "2" ]
+            [ "$(yq '.spec.ttlSecondsAfterFinished' <<<"$job")" = "3600" ]
+            [ "$(yq '.spec.template.spec.restartPolicy' <<<"$job")" = "Never" ]
+            [ "$(yq '.spec.template.spec.containers[0].image' <<<"$job")" = "mysql:8.4" ]
+            [ "$(yq '.spec.template.spec.containers[0].env[] | select(.name=="DB_HOST") | .valueFrom.secretKeyRef | .name + "/" + .key' <<<"$job")" = "app-db-secrets/host" ]
+            [ "$(yq '.spec.template.spec.containers[0].env[] | select(.name=="DB_PASS") | .valueFrom.secretKeyRef | .name + "/" + .key' <<<"$job")" = "app-db-secrets/password" ]
+            [ "$(yq '.spec.template.spec.containers[0].env[] | select(.name=="APP_NAME") | .valueFrom.fieldRef.fieldPath' <<<"$job")" = "metadata.namespace" ]
+            [ "$(yq '.spec.template.spec.containers[0].env[] | select(.name=="PR_NUMBER") | .valueFrom.fieldRef.fieldPath' <<<"$job")" = "metadata.labels['pull-request']" ]
+            yq '.spec.template.spec.containers[0].command[2]' <<<"$job" | grep -cF "case \"\$PR_NUMBER\" in '' | *[!0-9]*)"
+          done
+          yq '.spec.template.spec.containers[0].command[2]' <<<"$create" | grep -cF 'CREATE DATABASE IF NOT EXISTS \`${APP_NAME}_preview_${PR_NUMBER}\` CHARACTER SET utf8mb4'
+          yq '.spec.template.spec.containers[0].command[2]' <<<"$drop" | grep -cF 'DROP DATABASE IF EXISTS \`${APP_NAME}_preview_${PR_NUMBER}\`'
+
+          echo "custom secret name and label"
+          c=$(helm template myapp "$CHART" -n myapp -f examples/myapp/values.yaml -f examples/myapp/values.preview.yaml \
+                --set previewDatabase.secretName=other-db --set previewDatabase.keys.password=pw --set previewDatabase.pullRequestLabel=pr \
+              | yq 'select(.kind=="Job" and .metadata.name=="myapp-create-preview-db") | .spec.template.spec.containers[0].env')
+          [ "$(yq '.[] | select(.name=="DB_USER") | .valueFrom.secretKeyRef.name' <<<"$c")" = "other-db" ]
+          [ "$(yq '.[] | select(.name=="DB_PASS") | .valueFrom.secretKeyRef.key' <<<"$c")" = "pw" ]
+          [ "$(yq '.[] | select(.name=="PR_NUMBER") | .valueFrom.fieldRef.fieldPath' <<<"$c")" = "metadata.labels['pr']" ]
 
 
   version-bump:

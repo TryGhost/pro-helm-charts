@@ -111,3 +111,34 @@ hotReload:
     run: node src/main.js
     # -- Dependencies directory baked into the image, symlinked into the workspace.
     nodeModules: /app/node_modules
+
+# -- Per-PR preview database. Replaces the k8s repo's components/db-previews
+# Kustomize component: a wave-0 Job creates `<namespace>_preview_<pr>` on the
+# app's managed MySQL (after the wave -1 app-db-secrets ExternalSecret is
+# Ready) and a PostDelete hook Job drops it when ArgoCD deletes the preview
+# Application. Nothing else: pointing the app at that database
+# (db__connection__database etc.) stays in the app's preview values.
+# Connection details and admin credentials come from the app-db-secrets Secret
+# (secretsInjection.database); there is no separate preview user.
+previewDatabase:
+  enabled: false
+  image:
+    repository: mysql
+    tag: "8.4"
+  # -- Secret holding the MySQL connection details (pairs with
+  # secretsInjection.database, which creates app-db-secrets).
+  secretName: app-db-secrets
+  # -- Keys inside that Secret.
+  keys:
+    host: host
+    port: port
+    user: user
+    password: password
+  # -- Pod label holding the pull request number (stamped by the pull-request
+  # ApplicationSet). Same convention as hotReload.pullRequestLabel.
+  pullRequestLabel: pull-request
+  # -- Job retries before giving up.
+  backoffLimit: 2
+  # -- Seconds a finished Job is kept before garbage collection.
+  ttlSecondsAfterFinished: 3600
+  resources: {}

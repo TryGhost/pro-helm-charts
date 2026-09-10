@@ -34,6 +34,10 @@ hotReload:
   repo: ""              # default: read from the pod's ghost.org/git-repo annotation (set by the ApplicationSet)
   ref: ""               # default: refs/pull/<n>/head, <n> read from the pod's pull-request label
   # see charts/ghost-app/values.yaml for everything else
+
+previewDatabase:
+  enabled: false        # per-PR MySQL database: create Job (wave 0) + drop Job (PostDelete hook)
+  secretName: app-db-secrets
 ```
 
 ### Secret injection
@@ -112,6 +116,32 @@ and reaches `app-secrets` through `secretsInjection`, so hot reload needs
 `hotReload.ssh.secretName`). Example:
 [`examples/myapp/values.preview.yaml`](examples/myapp/values.preview.yaml).
 
+### Preview database (PR previews)
+
+`previewDatabase` is the Helm version of the k8s repo's
+`components/db-previews`. When enabled it renders two Jobs named
+`<release>-create-preview-db` and `<release>-drop-preview-db`, both running
+`mysql:8.4` with `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASS` from the
+`app-db-secrets` Secret (so it pairs with `secretsInjection.database: true`),
+`APP_NAME` from the pod's namespace and `PR_NUMBER` from its `pull-request`
+label. The database is `<namespace>_preview_<pr>`; a shell guard refuses a
+non-numeric PR number.
+
+- **create**: sync-wave 0 with `Force=true,Replace=true`, deliberately not a
+  PreSync hook. It needs the `app-db-secrets` Secret, which the wave -1
+  ExternalSecret only materialises during the sync, so a PreSync hook would
+  deadlock on a fresh namespace. The app's migrate initContainer retries until
+  the database exists. `CREATE DATABASE IF NOT EXISTS ... CHARACTER SET utf8mb4`
+  is idempotent.
+- **drop**: `PostDelete` hook with `HookSucceeded` delete policy, runs
+  `DROP DATABASE IF EXISTS` when ArgoCD deletes the preview Application.
+
+The chart does not stamp the per-PR `nameSuffix` or the `pull-request` label;
+both come from the pull-request ApplicationSet's kustomize transforms.
+Pointing the app at the database (`db__connection__database`) stays in the
+app's preview values. Example:
+[`examples/myapp/values.preview.yaml`](examples/myapp/values.preview.yaml).
+
 ### Using the chart
 
 ```yaml
@@ -119,7 +149,7 @@ and reaches `app-secrets` through `secretsInjection`, so hot reload needs
 helmCharts:
   - name: ghost-app
     repo: https://tryghost.github.io/pro-helm-charts
-    version: 0.1.3
+    version: 0.2.0
     releaseName: myapp
     namespace: myapp
     valuesFile: ../../base/values.yaml
@@ -131,8 +161,8 @@ or plain Helm:
 
 ```sh
 helm repo add ghost https://tryghost.github.io/pro-helm-charts
-helm install myapp ghost/ghost-app --version 0.1.3 -n myapp -f values.yaml
-helm show values ghost/ghost-app --version 0.1.3
+helm install myapp ghost/ghost-app --version 0.2.0 -n myapp -f values.yaml
+helm show values ghost/ghost-app --version 0.2.0
 ```
 
 Every published release bundles the `common` version from its `Chart.lock`, so
@@ -263,7 +293,7 @@ public API, so the PR body carries a checklist:
      | jq --slurpfile ext charts/ghost-app/schemas/ghost-app.json '
          .["$id"] = "https://github.com/TryGhost/pro-helm-charts/blob/main/charts/ghost-app/values.schema.json"
          | .title = "ghost-app values"
-         | .description = "bjw-s common library values (embedded verbatim from the locked common dependency) plus the options ghost-app adds: secretsInjection and hotReload."
+         | .description = "bjw-s common library values (embedded verbatim from the locked common dependency) plus the options ghost-app adds: secretsInjection, hotReload and previewDatabase."
          | .properties += $ext[0]' > charts/ghost-app/values.schema.json
    ```
 
@@ -321,8 +351,10 @@ In the app's `.k8s`:
      enabled: true
    ```
 
-   Other Kustomize components (preview databases, Gateway API name
-   references) are unaffected and stay.
+5. If the preview overlay references `components/db-previews`: remove it and
+   add `previewDatabase: {enabled: true}` to `values.preview.yaml`.
+   `gateway-api-name-refs` is supplied by the pull-request ApplicationSet and
+   is removed from the overlay too.
 
 In the k8s repo, once no app references them, delete
 `components/app-secrets` and `components/app-db-secrets`, and drop the
