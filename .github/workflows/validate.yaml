@@ -141,7 +141,8 @@ jobs:
           [ "$(yq '.spec.template.spec.containers[].name' <<<"$dep" | tr '\n' ' ')" = "git-sync main " ]
           [ "$(yq '.spec.template.spec.securityContext.fsGroup' <<<"$dep")" = "65533" ]
           gs=$(yq '.spec.template.spec.containers[] | select(.name=="git-sync")' <<<"$dep")
-          [ "$(yq '.image' <<<"$gs")" = "registry.k8s.io/git-sync/git-sync:v4.4.2" ]
+          # expected image comes from the chart defaults so Renovate bumps don't break this
+          [ "$(yq '.image' <<<"$gs")" = "$(yq '.hotReload.gitSync.image.repository + ":" + .hotReload.gitSync.image.tag' "$CHART/values.yaml")" ]
           yq '.args[]' <<<"$gs" | grep -cx -- '--period=2s'
           yq '.args[]' <<<"$gs" | grep -cx -- '--ref=refs/pull/__PR_NUMBER__/head'
           yq '.args[]' <<<"$gs" | grep -cx -- '--repo=git@github.com:TryGhost/myapp.git'
