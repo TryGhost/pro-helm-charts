@@ -13295,28 +13295,15 @@
               "pattern": "^/"
             }
           }
-        }
-      },
-      "if": {
-        "properties": {
-          "enabled": {
-            "const": true
-          }
-        }
-      },
-      "then": {
-        "properties": {
-          "repo": {
-            "minLength": 1
-          },
-          "ref": {
-            "minLength": 1
-          }
         },
-        "required": [
-          "repo",
-          "ref"
-        ]
+        "pullRequestLabel": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repoAnnotation": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     }
   },

@@ -26,13 +26,42 @@ as the app declared them.
 {{- default (printf "%s-git-sync-ssh" .Release.Name) .Values.hotReload.ssh.key -}}
 {{- end -}}
 
+{{/*
+git-sync env (git-sync reads GITSYNC_* when the flag is not given):
+  - GITSYNC_REPO from the pod annotation stamped by the pull-request
+    ApplicationSet, unless hotReload.repo is set (then passed as --repo).
+  - GITSYNC_REF from the pod's pull-request label, unless hotReload.ref is set.
+    $(APP_PR_NUMBER) is expanded by the kubelet (dependent env var expansion),
+    which only works for vars defined earlier; bjw-s emits env alphabetically,
+    so the helper var must sort before GITSYNC_REF.
+*/}}
+{{- define "ghost-app.hotReload.gitSyncEnv" -}}
+{{- $hr := .Values.hotReload -}}
+{{- if not $hr.repo }}
+GITSYNC_REPO:
+  valueFrom:
+    fieldRef:
+      fieldPath: metadata.annotations['{{ $hr.repoAnnotation }}']
+{{- end }}
+{{- if $hr.ref }}
+GITSYNC_REF: {{ $hr.ref | quote }}
+{{- else }}
+APP_PR_NUMBER:
+  valueFrom:
+    fieldRef:
+      fieldPath: metadata.labels['{{ $hr.pullRequestLabel }}']
+GITSYNC_REF: refs/pull/$(APP_PR_NUMBER)/head
+{{- end }}
+{{- end -}}
+
 {{- define "ghost-app.hotReload.gitSyncArgs" -}}
 {{- $hr := .Values.hotReload -}}
-- --repo={{ required "hotReload.repo is required when hotReload.enabled is true" $hr.repo }}
+{{- if $hr.repo }}
+- --repo={{ $hr.repo }}
+{{- end }}
 - --ssh-key-file=/etc/git-secret/ssh
 - --ssh-known-hosts=true
 - --ssh-known-hosts-file=/etc/git-hosts/known_hosts
-- --ref={{ required "hotReload.ref is required when hotReload.enabled is true" $hr.ref }}
 - --root={{ $hr.gitSync.root }}
 - --link={{ $hr.gitSync.link }}
 - --depth={{ $hr.gitSync.depth }}
@@ -81,6 +110,8 @@ controllers:
           tag: {{ $hr.gitSync.image.tag }}
         securityContext: {{ $gitSyncSecurityContext | toJson }}
         resources: {{ $hr.gitSync.resources | toJson }}
+        env:
+          {{- include "ghost-app.hotReload.gitSyncEnv" . | nindent 10 }}
         args:
           {{- include "ghost-app.hotReload.gitSyncArgs" . | nindent 10 }}
           - --one-time
@@ -91,6 +122,8 @@ controllers:
           tag: {{ $hr.gitSync.image.tag }}
         securityContext: {{ $gitSyncSecurityContext | toJson }}
         resources: {{ $hr.gitSync.resources | toJson }}
+        env:
+          {{- include "ghost-app.hotReload.gitSyncEnv" . | nindent 10 }}
         args:
           {{- include "ghost-app.hotReload.gitSyncArgs" . | nindent 10 }}
           - --period={{ $hr.gitSync.period }}

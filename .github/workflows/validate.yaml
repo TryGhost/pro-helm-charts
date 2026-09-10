@@ -67,7 +67,7 @@ jobs:
           set -x
           ! helm template t "$CHART" -f examples/minimal.yaml --set secretsInjection.bogus=1
           ! helm template t "$CHART" -f examples/minimal.yaml --set secretsInjection.store.kind=Nope
-          ! helm template t "$CHART" -f examples/minimal.yaml --set hotReload.enabled=true   # repo/ref missing
+          ! helm template t "$CHART" -f examples/minimal.yaml --set hotReload.enabled=true --set hotReload.controller=nope  # unknown controller
           ! helm template t "$CHART" -f examples/minimal.yaml --set controllers.main.bogus=1  # bjw-s schema still applies
 
       - name: Render examples
@@ -144,8 +144,18 @@ jobs:
           # expected image comes from the chart defaults so Renovate bumps don't break this
           [ "$(yq '.image' <<<"$gs")" = "$(yq '.hotReload.gitSync.image.repository + ":" + .hotReload.gitSync.image.tag' "$CHART/values.yaml")" ]
           yq '.args[]' <<<"$gs" | grep -cx -- '--period=2s'
-          yq '.args[]' <<<"$gs" | grep -cx -- '--ref=refs/pull/__PR_NUMBER__/head'
-          yq '.args[]' <<<"$gs" | grep -cx -- '--repo=git@github.com:TryGhost/myapp.git'
+          ! yq '.args[]' <<<"$gs" | grep -c -- '--repo='
+          [ "$(yq '.env[] | select(.name=="GITSYNC_REPO") | .valueFrom.fieldRef.fieldPath' <<<"$gs")" = "metadata.annotations['ghost.org/git-repo']" ]
+          [ "$(yq '.env[] | select(.name=="GITSYNC_REF") | .value' <<<"$gs")" = 'refs/pull/$(APP_PR_NUMBER)/head' ]
+          [ "$(yq '.env[] | select(.name=="APP_PR_NUMBER") | .valueFrom.fieldRef.fieldPath' <<<"$gs")" = "metadata.labels['pull-request']" ]
+          ! yq '.args[]' <<<"$gs" | grep -c -- '--ref='
+          # kubelet only expands $(VAR) for vars defined earlier; bjw-s sorts env alphabetically
+          [ "$(yq '.env[].name' <<<"$gs" | tr '\n' ' ')" = "APP_PR_NUMBER GITSYNC_REF GITSYNC_REPO " ]
+          echo "explicit repo/ref override"
+          ov=$(helm template myapp "$CHART" -n myapp -f examples/myapp/values.yaml -f examples/myapp/values.preview.yaml --set hotReload.repo=git@github.com:TryGhost/Daisy.js.git --set hotReload.ref=refs/heads/main | yq 'select(.kind=="Deployment") | .spec.template.spec.containers[] | select(.name=="git-sync")')
+          yq '.args[]' <<<"$ov" | grep -cx -- '--repo=git@github.com:TryGhost/Daisy.js.git'
+          [ "$(yq '.env[] | select(.name=="GITSYNC_REPO") | .name' <<<"$ov")" = "" ]
+          [ "$(yq '.env[] | select(.name=="GITSYNC_REF") | .value' <<<"$ov")" = "refs/heads/main" ]
           yq '.args[]' <<<"$gs" | grep -cx -- '--stale-worktree-timeout=5m'
           yq '.args[]' <<<"$gs" | grep -cx -- '--ssh-known-hosts-file=/etc/git-hosts/known_hosts'
           init=$(yq '.spec.template.spec.initContainers[] | select(.name=="git-sync-init")' <<<"$dep")

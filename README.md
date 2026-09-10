@@ -31,8 +31,8 @@ secretsInjection:
 
 hotReload:
   enabled: false        # git-sync init container + sidecar, dev runner in the app container
-  repo: ""              # required when enabled, e.g. git@github.com:TryGhost/<app>.git
-  ref: ""               # required when enabled, e.g. refs/pull/__PR_NUMBER__/head
+  repo: ""              # default: read from the pod's ghost.org/git-repo annotation (set by the ApplicationSet)
+  ref: ""               # default: refs/pull/<n>/head, <n> read from the pod's pull-request label
   # see charts/ghost-app/values.yaml for everything else
 ```
 
@@ -79,7 +79,15 @@ Full examples: [`examples/app-secrets.yaml`](examples/app-secrets.yaml),
 per-app `values.hot-reload.yaml`. When enabled it deep-merges the following into your values before rendering, and
 touches nothing else (env, envFrom and your own volumes are preserved):
 
-- `controllers.<controller>.initContainers.git-sync-init`: one-time clone of `ref`.
+- `controllers.<controller>.initContainers.git-sync-init`: one-time clone.
+  Repository and ref are read from the pod at runtime through git-sync's
+  `GITSYNC_REPO` / `GITSYNC_REF` env: the clone URL from the
+  `ghost.org/git-repo` annotation and the PR number from the `pull-request`
+  label, both stamped on every preview pod by the pull-request ApplicationSet
+  (`kustomize.commonAnnotations` / `commonLabels`). Nothing per-app or per-PR
+  needs to be written into values. Set `hotReload.repo` / `hotReload.ref` to
+  override (a repository is not derivable from the release name: `daisy-js`
+  vs `Daisy.js`).
 - `controllers.<controller>.containers.git-sync`: sidecar polling every `2s`
   (`gitSync.period`), publishing `/workspace/git/app` with git-sync's atomic
   symlink contract and keeping stale worktrees for `5m`.
@@ -101,8 +109,7 @@ touches nothing else (env, envFrom and your own volumes are preserved):
 The deploy key is written to Secret Manager by the Terraform `argocd` module
 and reaches `app-secrets` through `secretsInjection`, so hot reload needs
 `secretsInjection.enabled: true` (or an equivalent Secret named in
-`hotReload.ssh.secretName`). `__PR_NUMBER__` is still substituted by
-`gitops-sync` when it snapshots the preview branch. Example:
+`hotReload.ssh.secretName`). Example:
 [`examples/myapp/values.preview.yaml`](examples/myapp/values.preview.yaml).
 
 ### Using the chart
@@ -112,7 +119,7 @@ and reaches `app-secrets` through `secretsInjection`, so hot reload needs
 helmCharts:
   - name: ghost-app
     repo: https://tryghost.github.io/pro-helm-charts
-    version: 0.1.2
+    version: 0.1.3
     releaseName: myapp
     namespace: myapp
     valuesFile: ../../base/values.yaml
@@ -124,8 +131,8 @@ or plain Helm:
 
 ```sh
 helm repo add ghost https://tryghost.github.io/pro-helm-charts
-helm install myapp ghost/ghost-app --version 0.1.2 -n myapp -f values.yaml
-helm show values ghost/ghost-app --version 0.1.2
+helm install myapp ghost/ghost-app --version 0.1.3 -n myapp -f values.yaml
+helm show values ghost/ghost-app --version 0.1.3
 ```
 
 Every published release bundles the `common` version from its `Chart.lock`, so
@@ -312,8 +319,6 @@ In the app's `.k8s`:
    ```yaml
    hotReload:
      enabled: true
-     repo: git@github.com:TryGhost/<app>.git
-     ref: refs/pull/__PR_NUMBER__/head
    ```
 
    Other Kustomize components (preview databases, Gateway API name

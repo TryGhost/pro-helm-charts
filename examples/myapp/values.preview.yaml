@@ -41,9 +41,9 @@ route:
 # Hot reload: replaces values.hot-reload.yaml. The chart adds the git-sync
 # init container + sidecar, the /workspace emptyDir, the pinned known_hosts
 # ConfigMap and the SSH-key-only Secret projection, and runs `pnpm dev`
-# (nodemon, --legacy-watch) against the synced checkout. gitops-sync still
-# substitutes __PR_NUMBER__ when snapshotting the preview branch.
+# (nodemon, --legacy-watch) against the synced checkout.
+# Repository and ref come from the pod at runtime: the pull-request
+# ApplicationSet stamps the ghost.org/git-repo annotation and the pull-request
+# label on every preview pod.
 hotReload:
   enabled: true
-  repo: git@github.com:TryGhost/myapp.git
-  ref: refs/pull/__PR_NUMBER__/head

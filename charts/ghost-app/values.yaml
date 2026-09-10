@@ -43,10 +43,21 @@ hotReload:
   controller: main
   # -- Container in that controller whose command/args are replaced.
   container: main
-  # -- Git repository to sync (SSH form). Required when enabled.
+  # -- Git repository to sync (SSH form), e.g. git@github.com:TryGhost/Daisy.js.git.
+  # Empty = read at runtime from the pod annotation `<repoAnnotation>`
+  # (git-sync's GITSYNC_REPO), which the pull-request ApplicationSet stamps on
+  # every preview via kustomize commonAnnotations. Set explicitly to override.
   repo: ""
-  # -- Git ref to follow, e.g. refs/pull/__PR_NUMBER__/head. Required when enabled.
+  # -- Pod annotation holding the clone URL. Used only when `repo` is empty.
+  repoAnnotation: ghost.org/git-repo
+  # -- Git ref to follow. Empty = derived at runtime from the pod's
+  # `<pullRequestLabel>` label as refs/pull/<number>/head (git-sync's
+  # GITSYNC_REF), so no __PR_NUMBER__ substitution is needed. Set explicitly
+  # (e.g. a branch) to override.
   ref: ""
+  # -- Pod label holding the pull request number (stamped by the pull-request
+  # ApplicationSet). Used only when `ref` is empty.
+  pullRequestLabel: pull-request
   # -- emptyDir mount path shared by git-sync and the app container.
   workspace: /workspace
   gitSync:
