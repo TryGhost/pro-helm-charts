@@ -36,7 +36,7 @@ route:
   main:
     enabled: true
     hostnames:
-      - scheduler-__PR_NUMBER__.ghostinfra.net
+      - myapp-__PR_NUMBER__.ghostinfra.net
 
 # Hot reload: replaces values.hot-reload.yaml. The chart adds the git-sync
 # init container + sidecar, the /workspace emptyDir, the pinned known_hosts
@@ -45,5 +45,5 @@ route:
 # substitutes __PR_NUMBER__ when snapshotting the preview branch.
 hotReload:
   enabled: true
-  repo: git@github.com:TryGhost/Scheduler.git
+  repo: git@github.com:TryGhost/myapp.git
   ref: refs/pull/__PR_NUMBER__/head

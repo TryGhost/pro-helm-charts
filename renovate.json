@@ -78,7 +78,7 @@
       "commitMessagePrefix": "feat(ghost-app)!:"
     },
     {
-      "description": "git-sync image in ghost-app values.yaml (helm-values manager).",
+      "description": "git-sync image in ghost-app values.yaml (helm-values manager). No digest pinning: the tag is rendered as image:tag.",
       "matchManagers": [
         "helm-values"
       ],
@@ -87,7 +87,8 @@
       ],
       "prBodyNotes": [
         "Bump `version` in `charts/ghost-app/Chart.yaml` (patch) before merging; CI enforces it. Renovate cannot bump it for values.yaml changes."
-      ]
+      ],
+      "pinDigests": false
     },
     {
       "description": "GitHub Actions: keep SHA pins, review-required, group minors/patches.",

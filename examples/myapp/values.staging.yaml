@@ -14,4 +14,4 @@ route:
   main:
     enabled: true
     hostnames:
-      - scheduler.ghostinfra.net
+      - myapp.ghostinfra.net

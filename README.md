@@ -32,7 +32,7 @@ secretsInjection:
 
 hotReload:
   enabled: false        # git-sync init container + sidecar, dev runner in the app container
-  repo: ""              # required when enabled, e.g. git@github.com:TryGhost/Scheduler.git
+  repo: ""              # required when enabled, e.g. git@github.com:TryGhost/<app>.git
   ref: ""               # required when enabled, e.g. refs/pull/__PR_NUMBER__/head
   # see charts/ghost-app/values.yaml for everything else
 ```
@@ -76,8 +76,8 @@ Full examples: [`examples/app-secrets.yaml`](examples/app-secrets.yaml),
 
 ### Hot reload (PR previews)
 
-`hotReload` is the Helm version of Scheduler's `values.hot-reload.yaml`. When
-enabled it deep-merges the following into your values before rendering, and
+`hotReload` packages the git-sync preview pattern previously kept in a
+per-app `values.hot-reload.yaml`. When enabled it deep-merges the following into your values before rendering, and
 touches nothing else (env, envFrom and your own volumes are preserved):
 
 - `controllers.<controller>.initContainers.git-sync-init`: one-time clone of `ref`.
@@ -88,7 +88,9 @@ touches nothing else (env, envFrom and your own volumes are preserved):
   `/sbin/tini -g -- sh -ec` running
   `ln -sfn /app/node_modules /workspace/node_modules` then
   `exec pnpm dev --legacy-watch --watch /workspace/git/app --exec 'sh -c "cd /workspace/git/app && exec node src/main.js"'`.
-  Change `hotReload.app.{devCommand,run,nodeModules}` for other apps, or set
+  These defaults suit a Node app whose image has `pnpm dev` (nodemon) and its
+  dependencies under `/app/node_modules`; change
+  `hotReload.app.{devCommand,run,nodeModules}` for others, or set
   `hotReload.app.args` to take over the script entirely.
 - `configMaps.git-sync-hosts` with GitHub's published Ed25519 host key,
   mounted at `/etc/git-hosts/known_hosts` (host-key verification on).
@@ -102,7 +104,7 @@ and reaches `app-secrets` through `secretsInjection`, so hot reload needs
 `secretsInjection.enabled: true` (or an equivalent Secret named in
 `hotReload.ssh.secretName`). `__PR_NUMBER__` is still substituted by
 `gitops-sync` when it snapshots the preview branch. Example:
-[`examples/scheduler/values.preview.yaml`](examples/scheduler/values.preview.yaml).
+[`examples/myapp/values.preview.yaml`](examples/myapp/values.preview.yaml).
 
 ### Using the chart
 
@@ -112,8 +114,8 @@ helmCharts:
   - name: ghost-app
     repo: oci://ghcr.io/tryghost/charts
     version: 0.1.0
-    releaseName: scheduler
-    namespace: scheduler
+    releaseName: myapp
+    namespace: myapp
     valuesFile: ../../base/values.yaml
     additionalValuesFiles:
       - values.staging.yaml
@@ -122,7 +124,7 @@ helmCharts:
 or plain Helm:
 
 ```sh
-helm install scheduler oci://ghcr.io/tryghost/charts/ghost-app --version 0.1.0 -n scheduler -f values.yaml
+helm install myapp oci://ghcr.io/tryghost/charts/ghost-app --version 0.1.0 -n myapp -f values.yaml
 helm show values oci://ghcr.io/tryghost/charts/ghost-app --version 0.1.0
 ```
 
@@ -137,8 +139,8 @@ helm repo add bjw-s https://bjw-s-labs.github.io/helm-charts
 helm dependency build charts/ghost-app          # fetches charts/common-<ver>.tgz from Chart.lock
 helm lint --strict charts/ghost-app -f examples/minimal.yaml
 helm template app charts/ghost-app -n app -f examples/app-db-secrets.yaml
-helm template scheduler charts/ghost-app -n scheduler \
-  -f examples/scheduler/values.yaml -f examples/scheduler/values.preview.yaml
+helm template myapp charts/ghost-app -n myapp \
+  -f examples/myapp/values.yaml -f examples/myapp/values.preview.yaml
 ```
 
 `charts/ghost-app/charts/` (downloaded archives) is git-ignored; `Chart.yaml`
@@ -154,8 +156,8 @@ first job of every release:
 - `values.schema.json` must equal the locked common schema plus
   `schemas/ghost-app.json` (see *Updating common*).
 - `helm lint --strict` with each example (minimal, app-secrets,
-  app-db-secrets, Scheduler staging/production/preview) and a set of values the
-  schema must reject.
+  app-db-secrets, and the full `myapp` staging/production/preview set) and a
+  set of values the schema must reject.
 - `helm template` with each example plus assertions on resource names, Secret
   and store references, namespace selectors, refresh interval, sync-wave
   annotation, the untouched `{{ (.db | fromJson).* }}` ESO expressions, the
@@ -164,11 +166,11 @@ first job of every release:
 - On PRs: `charts/ghost-app` changes require a new `version` that has not been
   released.
 
-Rendering checks prove the manifests are what we expect, and the migrated
-Scheduler overlays were diffed against the current app-template + Kustomize
-render (only `helm.sh/chart` labels differ). They do not prove runtime
-behaviour: ESO actually finding secrets, git-sync authenticating, nodemon
-restarting. Verify those on a staging/preview deployment.
+Rendering checks prove the manifests are what we expect, and an app-template
+deployment migrated to ghost-app renders the same resources (only
+`helm.sh/chart` labels differ). They do not prove runtime behaviour: ESO
+actually finding secrets, git-sync authenticating, the dev runner restarting.
+Verify those on a staging/preview deployment.
 
 ### Schema
 
@@ -253,7 +255,7 @@ public API, so the PR body carries a checklist:
    minor if the update exposes new features you want to advertise. For
    **major** common updates Renovate deliberately does not bump anything and
    labels the PR `breaking-upstream`: that PR is the compatibility PR. Read
-   the upstream upgrade guide, render `examples/scheduler` against the old and
+   the upstream upgrade guide, render `examples/myapp` against the old and
    new version, and either absorb small differences in `templates/` (minor
    bump) or release a new ghost-app major with migration notes in this README.
    The wrapper does not eliminate upstream breaking changes; it gives one
@@ -271,41 +273,41 @@ independently; each release bundles its own common, so upgrading one app never
 forces another. To roll back, set `version:` back to the previous release
 (all versions remain on GHCR) and let ArgoCD sync.
 
-## Migrating Scheduler from app-template
+## Migrating an app from app-template
 
-The migrated layout is in [`examples/scheduler`](examples/scheduler); it was
-rendered through `kubectl kustomize --enable-helm` with the k8s repo's
-components and diffed against the current app-template render: same resource
-set in staging, production and preview, identical specs, only
-`helm.sh/chart: ghost-app-0.1.0` labels and standard labels on the
+[`examples/myapp`](examples/myapp) shows the target layout for an app deployed
+through the k8s gitops repo (`base/values.yaml` plus one values file per
+environment). A migrated app renders the same resource set as before with
+identical specs; only the `helm.sh/chart` labels and standard labels on the
 ExternalSecrets differ.
 
-In `Scheduler/.k8s`:
+In the app's `.k8s`:
 
 1. `base/kustomization.yaml`: remove the `components:` block referencing
    `components/app-secrets` and `components/app-db-secrets`. Keep
-   `namespace: scheduler`.
+   `namespace: <app>`.
 2. `base/values.yaml`: add
 
    ```yaml
    secretsInjection:
      enabled: true
-     database: true
+     database: true   # only for apps with a Terraform-managed database
    ```
 
 3. Every overlay's `helmCharts` entry: `name: ghost-app`,
-   `repo: oci://ghcr.io/tryghost/charts`, `version: 0.1.0`.
-4. `overlays/preview`: delete `values.hot-reload.yaml` and its
-   `additionalValuesFiles` entry; append to `values.preview.yaml`:
+   `repo: oci://ghcr.io/tryghost/charts`, `version: <release>`.
+4. If the app has a preview overlay with a `values.hot-reload.yaml`: delete it
+   and its `additionalValuesFiles` entry, and add to `values.preview.yaml`:
 
    ```yaml
    hotReload:
      enabled: true
-     repo: git@github.com:TryGhost/Scheduler.git
+     repo: git@github.com:TryGhost/<app>.git
      ref: refs/pull/__PR_NUMBER__/head
    ```
 
-   `components/db-previews` and `components/gateway-api-name-refs` stay.
+   Other Kustomize components (preview databases, Gateway API name
+   references) are unaffected and stay.
 
 In the k8s repo, once no app references them, delete
 `components/app-secrets` and `components/app-db-secrets`, and drop the

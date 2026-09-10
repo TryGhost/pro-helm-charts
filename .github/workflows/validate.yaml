@@ -59,7 +59,7 @@ jobs:
             helm lint --strict "$CHART" -f "$f"
           done
           for env in staging production preview; do
-            helm lint --strict "$CHART" -f examples/scheduler/values.yaml -f "examples/scheduler/values.$env.yaml"
+            helm lint --strict "$CHART" -f examples/myapp/values.yaml -f "examples/myapp/values.$env.yaml"
           done
 
       - name: Schema rejects invalid values
@@ -77,8 +77,8 @@ jobs:
           helm template app "$CHART" -n app -f examples/app-secrets.yaml    > out/app-secrets.yaml
           helm template app "$CHART" -n app -f examples/app-db-secrets.yaml > out/app-db-secrets.yaml
           for env in staging production preview; do
-            helm template scheduler "$CHART" -n scheduler \
-              -f examples/scheduler/values.yaml -f "examples/scheduler/values.$env.yaml" > "out/scheduler-$env.yaml"
+            helm template myapp "$CHART" -n myapp \
+              -f examples/myapp/values.yaml -f "examples/myapp/values.$env.yaml" > "out/myapp-$env.yaml"
           done
 
       - name: Check secret injection rendering
@@ -121,12 +121,12 @@ jobs:
           [ "$(yq 'select(.kind=="Deployment") | .spec.template.spec.containers[0].envFrom' out/app-secrets.yaml)" = "null" ]
           [ "$(yq 'select(.kind=="Deployment") | .spec.template.spec.containers[0].env[0].valueFrom.secretKeyRef.name' out/app-secrets.yaml)" = "app-secrets" ]
 
-      - name: Check Scheduler rendering
+      - name: Check full-app rendering
         run: |
           set -euo pipefail
           for env in staging production; do
-            f="out/scheduler-$env.yaml"
-            [ "$(yq -N 'select(.kind=="ExternalSecret") | .spec.dataFrom[0].find.tags.namespace' "$f" | sort -u)" = "scheduler" ]
+            f="out/myapp-$env.yaml"
+            [ "$(yq -N 'select(.kind=="ExternalSecret") | .spec.dataFrom[0].find.tags.namespace' "$f" | sort -u)" = "myapp" ]
             [ "$(yq 'select(.kind=="Deployment") | .spec.template.spec.containers | length' "$f")" = "1" ]
             [ "$(yq 'select(.kind=="Deployment") | .spec.template.spec.containers[0].command | join(" ")' "$f")" = "node src/main.js" ]
             [ "$(yq 'select(.kind=="Deployment") | .spec.template.spec.initContainers[0].name' "$f")" = "migrate" ]
@@ -135,7 +135,7 @@ jobs:
           done
 
           echo "preview: hot reload"
-          f=out/scheduler-preview.yaml
+          f=out/myapp-preview.yaml
           dep=$(yq 'select(.kind=="Deployment")' "$f")
           [ "$(yq '.spec.template.spec.initContainers[].name' <<<"$dep" | tr '\n' ' ')" = "git-sync-init migrate " ]
           [ "$(yq '.spec.template.spec.containers[].name' <<<"$dep" | tr '\n' ' ')" = "git-sync main " ]
@@ -144,7 +144,7 @@ jobs:
           [ "$(yq '.image' <<<"$gs")" = "registry.k8s.io/git-sync/git-sync:v4.4.2" ]
           yq '.args[]' <<<"$gs" | grep -cx -- '--period=2s'
           yq '.args[]' <<<"$gs" | grep -cx -- '--ref=refs/pull/__PR_NUMBER__/head'
-          yq '.args[]' <<<"$gs" | grep -cx -- '--repo=git@github.com:TryGhost/Scheduler.git'
+          yq '.args[]' <<<"$gs" | grep -cx -- '--repo=git@github.com:TryGhost/myapp.git'
           yq '.args[]' <<<"$gs" | grep -cx -- '--stale-worktree-timeout=5m'
           yq '.args[]' <<<"$gs" | grep -cx -- '--ssh-known-hosts-file=/etc/git-hosts/known_hosts'
           init=$(yq '.spec.template.spec.initContainers[] | select(.name=="git-sync-init")' <<<"$dep")
@@ -156,15 +156,15 @@ jobs:
           yq '.args[0]' <<<"$main" | grep -c 'ln -sfn /app/node_modules /workspace/node_modules'
           echo "SSH key projected only into git-sync containers, only the one key"
           [ "$(yq '.spec.template.spec.volumes[] | select(.name=="git-sync-ssh") | .secret.secretName' <<<"$dep")" = "app-secrets" ]
-          [ "$(yq '.spec.template.spec.volumes[] | select(.name=="git-sync-ssh") | .secret.items[0].key' <<<"$dep")" = "scheduler-git-sync-ssh" ]
+          [ "$(yq '.spec.template.spec.volumes[] | select(.name=="git-sync-ssh") | .secret.items[0].key' <<<"$dep")" = "myapp-git-sync-ssh" ]
           [ "$(yq '.spec.template.spec.volumes[] | select(.name=="git-sync-ssh") | .secret.defaultMode' <<<"$dep")" = "288" ]
           [ "$(yq '.volumeMounts[] | select(.name=="git-sync-ssh") | .mountPath' <<<"$main")" = "" ]
           [ "$(yq '.volumeMounts[] | select(.name=="git-sync-ssh") | .mountPath' <<<"$gs")" = "/etc/git-secret" ]
           [ "$(yq '.volumeMounts[] | select(.name=="workspace") | .mountPath' <<<"$main")" = "/workspace" ]
           echo "main container env untouched by hot reload"
           [ "$(yq '.env[] | select(.name=="db__connection__database") | .value' <<<"$main")" = '$(APP_NAME)_preview_$(PR_NUMBER)' ]
-          [ "$(yq -N 'select(.kind=="ConfigMap") | .metadata.name' "$f" | sort | tr '\n' ' ')" = "scheduler-config scheduler-git-sync-hosts " ]
-          [ "$(yq 'select(.kind=="HTTPRoute") | .spec.hostnames[0]' "$f")" = "scheduler-__PR_NUMBER__.ghostinfra.net" ]
+          [ "$(yq -N 'select(.kind=="ConfigMap") | .metadata.name' "$f" | sort | tr '\n' ' ')" = "myapp-config myapp-git-sync-hosts " ]
+          [ "$(yq 'select(.kind=="HTTPRoute") | .spec.hostnames[0]' "$f")" = "myapp-__PR_NUMBER__.ghostinfra.net" ]
 
 
   version-bump:

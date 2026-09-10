@@ -1,7 +1,7 @@
-# Scheduler base values for ghost-app (proposed .k8s/base/values.yaml).
-# Identical to the app-template values, plus secretsInjection, which replaces
+# Full application example: base values (one per app, shared by all environments).
+# Plain bjw-s values plus secretsInjection, which replaces
 # the two Kustomize component references (components/app-secrets and
-# components/app-db-secrets) that used to sit in .k8s/base/kustomization.yaml.
+# components/app-db-secrets) an app-template deployment referenced from Kustomize.
 secretsInjection:
   enabled: true
   database: true
@@ -12,7 +12,7 @@ controllers:
       main:
         # Bumped by .github/workflows/build.yml on each push to main.
         image: &image
-          repository: registry.digitalocean.com/ghost/scheduler
+          repository: registry.digitalocean.com/ghost/myapp
           tag: latest
         command:
           - node
@@ -22,7 +22,7 @@ controllers:
               identifier: config
         env: &env
           # Explicit mappings: the app-db-secrets Secret (app-db-secrets, exploded
-          # from Terraform's <env>-schedulerdb GCP secret) uses plain field
+          # from Terraform's <env>-<app>db GCP secret) uses plain field
           # names, not the nconf env var names, so envFrom on the Secret can't
           # be used. The database name is not in the GCP secret (the cluster
           # only knows DO's defaultdb) — it comes from the config ConfigMap;
@@ -88,7 +88,7 @@ configMaps:
       NODE_ENV: production
       db__client: mysql2
       db__connection__charset: utf8mb4
-      db__connection__database: scheduler
+      db__connection__database: myapp
 
 service:
   main:
