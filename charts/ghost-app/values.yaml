@@ -94,7 +94,7 @@ hotReload:
     #   exec <devCommand> --legacy-watch --watch <checkout> --exec 'sh -c "cd <checkout> && exec <run>"'
     # Set a non-empty list to take full control (command is used verbatim).
     args: []
-    # -- Dev runner in the image (Scheduler: `pnpm dev` == nodemon).
+    # -- Dev runner in the image (e.g. `pnpm dev` running nodemon).
     devCommand: pnpm dev
     # -- Command the runner (re)starts inside the synced checkout.
     run: node src/main.js

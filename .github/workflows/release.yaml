@@ -1,17 +1,18 @@
-# Package and publish charts as OCI artifacts to GHCR:
-#   oci://ghcr.io/tryghost/charts/<chart>:<version>
+# Package and publish charts to the GitHub Pages Helm repository
+# (https://tryghost.github.io/pro-helm-charts) with helm/chart-releaser.
 #
-# Trigger: a push to main that touches charts/**. For every chart whose
-# Chart.yaml version has no GitHub release yet, this job bundles the locked
-# dependencies, packages, pushes to GHCR and creates the release
-# <chart>-<version> with the .tgz attached. Versions that already have a
-# release are skipped, never overwritten (validate.yaml's version-bump job
-# blocks PRs that would try).
+# Trigger: a push to main that touches charts/**. chart-releaser diffs
+# charts/ against the latest release tag, packages every chart whose
+# directory changed, creates a GitHub release + tag <chart>-<version> with the
+# .tgz attached, and rewrites index.yaml on the gh-pages branch, keeping
+# every previous entry. `skip_existing` means an already-released version is
+# never overwritten; validate.yaml's version-bump job blocks PRs that would
+# try.
 #
-# The source repository can stay private: package visibility on GHCR is
-# independent, and is set to public once, by hand, after the first push
-# (see README "Publishing the first release"). Consumers then pull
-# anonymously.
+# The gh-pages push uses GITHUB_TOKEN, so it triggers no further Actions
+# workflows. GitHub's own Pages build (pages-build-deployment) is not an
+# Actions workflow and still runs, so index.yaml goes live within a minute
+# or two.
 name: release
 
 on:
@@ -31,7 +32,6 @@ concurrency:
 
 env:
   HELM_VERSION: v4.1.4
-  OCI_REPO: oci://ghcr.io/${{ github.repository_owner }}/charts
 
 jobs:
   validate:
@@ -44,48 +44,49 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     permissions:
-      contents: write # create the release and its tag
-      packages: write # push to ghcr.io
+      contents: write # create the release and its tag, push gh-pages
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # chart-releaser diffs against the latest tag
+
+      - name: Configure git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Ensure the gh-pages branch exists
+        # chart-releaser pushes index.yaml to gh-pages and fails if the branch
+        # is missing. Create an empty orphan branch on first run.
+        run: |
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null; then
+            echo "gh-pages exists"; exit 0
+          fi
+          git switch --orphan gh-pages
+          git commit --allow-empty -m "Initialise Helm repository index branch"
+          git push origin gh-pages
+          git switch -
 
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
           version: ${{ env.HELM_VERSION }}
 
-      - name: Log in to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
-
-      - name: Package and push unreleased chart versions
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Bundle the locked common dependency
+        # helm package includes charts/*.tgz, so each release ships the exact
+        # common version from Chart.lock and apps never need the bjw-s repo.
         run: |
-          set -euo pipefail
           helm repo add bjw-s https://bjw-s-labs.github.io/helm-charts
-          oci_repo=$(tr 'A-Z' 'a-z' <<<"$OCI_REPO")   # GHCR paths are lowercase
-          mkdir -p .cr-release-packages
-          for dir in charts/*/; do
-            name=$(yq '.name' "$dir/Chart.yaml")
-            version=$(yq '.version' "$dir/Chart.yaml")
-            tag="$name-$version"
-            if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-              echo "$tag already released, skipping (releases are immutable)"
-              continue
-            fi
-            if helm show chart "$oci_repo/$name" --version "$version" >/dev/null 2>&1; then
-              echo "::error::$oci_repo/$name:$version exists on GHCR but has no GitHub release; refusing to overwrite. Bump the version." >&2
-              exit 1
-            fi
-            # Bundle the exact dependency versions from Chart.lock so consumers
-            # never need the bjw-s repository.
-            helm dependency build "$dir"
-            helm package "$dir" --destination .cr-release-packages
-            pkg=".cr-release-packages/$tag.tgz"
-            helm push "$pkg" "$oci_repo"
-            gh release create "$tag" "$pkg" \
-              --repo "$GITHUB_REPOSITORY" \
-              --title "$tag" \
-              --generate-notes \
-              --notes "Chart: \`$oci_repo/$name:$version\` (\`helm pull $oci_repo/$name --version $version\`)"
-            echo "released $tag -> $oci_repo/$name:$version"
+          for chart in charts/*/; do
+            helm dependency build "$chart"
           done
+
+      - name: Run chart-releaser
+        uses: helm/chart-releaser-action@cae68fefc6b5f367a0275617c9f83181ba54714f # v1.7.0
+        with:
+          charts_dir: charts
+          pages_branch: gh-pages
+          skip_existing: true
+          mark_as_latest: true
+        env:
+          CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CR_GENERATE_RELEASE_NOTES: "true"

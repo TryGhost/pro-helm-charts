@@ -4,4 +4,5 @@ charts/*/charts/
 # Local helm packaging output
 *.tgz
 .cr-release-packages/
+.cr-index/
 .DS_Store

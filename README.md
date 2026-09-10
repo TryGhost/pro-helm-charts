@@ -1,9 +1,9 @@
 # pro-helm-charts
 
-Ghost's Helm charts, published from this repository as OCI artifacts to
-GitHub Container Registry: `oci://ghcr.io/tryghost/charts/<chart>`. The
-packages are public even though this repository is private, so ArgoCD and
-`helm` pull them anonymously.
+Ghost's Helm charts, published from this repository to the GitHub Pages
+Helm repository `https://tryghost.github.io/pro-helm-charts` via
+[chart-releaser](https://github.com/helm/chart-releaser). ArgoCD and `helm`
+fetch it anonymously.
 
 | Chart | What it is |
 |---|---|
@@ -109,11 +109,11 @@ and reaches `app-secrets` through `secretsInjection`, so hot reload needs
 ### Using the chart
 
 ```yaml
-# kustomize helmCharts entry (ArgoCD with --enable-helm; OCI repos need kustomize >= 5.0)
+# kustomize helmCharts entry (ArgoCD with --enable-helm)
 helmCharts:
   - name: ghost-app
-    repo: oci://ghcr.io/tryghost/charts
-    version: 0.1.0
+    repo: https://tryghost.github.io/pro-helm-charts
+    version: 0.1.1
     releaseName: myapp
     namespace: myapp
     valuesFile: ../../base/values.yaml
@@ -124,8 +124,9 @@ helmCharts:
 or plain Helm:
 
 ```sh
-helm install myapp oci://ghcr.io/tryghost/charts/ghost-app --version 0.1.0 -n myapp -f values.yaml
-helm show values oci://ghcr.io/tryghost/charts/ghost-app --version 0.1.0
+helm repo add ghost https://tryghost.github.io/pro-helm-charts
+helm install myapp ghost/ghost-app --version 0.1.1 -n myapp -f values.yaml
+helm show values ghost/ghost-app --version 0.1.1
 ```
 
 Every published release bundles the `common` version from its `Chart.lock`, so
@@ -189,43 +190,48 @@ overwritten. Every releasable change to `charts/ghost-app` therefore needs a
 new `version` in `Chart.yaml` (semver: patch for fixes, minor for backwards
 compatible additions, major when values or rendered resources change
 incompatibly). CI blocks PRs that change the chart without a bump or reuse a
-released version, and the release job skips versions that already have a
-GitHub release and refuses to push over an existing GHCR tag.
+released version; chart-releaser runs with `skip_existing` as a second guard.
 
 Merging to `main` with a chart change runs `.github/workflows/release.yaml`:
-validate, `helm dependency build` (bundling the locked common), `helm package`,
-`helm push` to `oci://ghcr.io/tryghost/charts`, and a GitHub release
-`ghost-app-<version>` with the `.tgz` attached. Old versions stay on GHCR, so
-apps can keep pinning them. The job authenticates with `GITHUB_TOKEN` only
-(`packages: write`, `contents: write`); no PAT.
+validate, `helm dependency build` (bundling the locked common), then
+`helm/chart-releaser-action`, which creates the GitHub release and tag
+`ghost-app-<version>` with the `.tgz` attached and merges the entry into
+`index.yaml` on the `gh-pages` branch. Old entries are kept, so apps can keep
+pinning older versions. Only `GITHUB_TOKEN` is used (`contents: write` at job
+level); no PAT or extra secret.
 
 ### Publishing the first release (one-time setup)
 
-Prepared locally, nothing is pushed by this repository's tooling. To go live:
+1. The repository must be **public** (GitHub Pages is not available for
+   private repositories outside Enterprise Cloud). It is.
+2. Push `main`. The release workflow creates the `gh-pages` branch itself if
+   it is missing, publishes `ghost-app-<version>` and writes `index.yaml`.
+3. Enable Pages once, as repo admin: *Settings → Pages → Build and
+   deployment → Source: Deploy from a branch → Branch: `gh-pages` / `/ (root)`*,
+   or:
 
-1. *Settings → Actions → General → Workflow permissions* can stay at the
-   restrictive default: the workflows declare job-level permissions.
-2. Ruleset / branch protection on `main`: require the `validate` checks
+   ```sh
+   gh api -X POST repos/TryGhost/pro-helm-charts/pages \
+     -f build_type=legacy -f 'source[branch]=gh-pages' -f 'source[path]=/'
+   ```
+
+   GitHub's Pages build then serves `index.yaml` a minute or two after every
+   gh-pages push.
+4. Ruleset / branch protection on `main`: require the `validate` checks
    (`Lint and render`, `Chart version bumped`) and a review. This is what
    makes the version-bump rule enforceable.
-3. Push `main`. The release workflow publishes
-   `ghcr.io/tryghost/charts/ghost-app:0.1.0` and the GitHub release
-   `ghost-app-0.1.0`. The first push creates the package as **private**
-   (inherited from the repository).
-4. Make the package public, once: *TryGhost org → Packages → `charts/ghost-app`
-   → Package settings → Danger zone → Change visibility → Public*. Also
-   confirm the repository is linked to the package under *Manage Actions
-   access* (it is, automatically, when pushed with `GITHUB_TOKEN`), so future
-   workflow runs can keep pushing. Visibility persists for all later versions.
-5. Verify anonymously:
-   `helm show chart oci://ghcr.io/tryghost/charts/ghost-app --version 0.1.0`
-   from a machine with no `helm registry login`.
+5. Verify:
+
+   ```sh
+   helm repo add ghost https://tryghost.github.io/pro-helm-charts
+   helm search repo ghost/ghost-app --versions
+   ```
+
 6. Install [Renovate](https://github.com/apps/renovate) on the repository (the
    config is `renovate.json`).
 
-No GitHub Pages, `gh-pages` branch or `index.yaml` is involved. ArgoCD needs
-no access to this repository: `kustomize build --enable-helm` on the
-repo-server runs a plain anonymous `helm pull` against GHCR.
+ArgoCD needs no access to this repository: `kustomize build --enable-helm`
+on the repo-server runs a plain anonymous `helm pull` against the Pages URL.
 
 ## Updating common (Renovate)
 
@@ -271,7 +277,7 @@ are updated by Renovate the same way (review-required, patch bump reminder).
 Apps pin a ghost-app version in their `helmCharts` entry and upgrade
 independently; each release bundles its own common, so upgrading one app never
 forces another. To roll back, set `version:` back to the previous release
-(all versions remain on GHCR) and let ArgoCD sync.
+(all versions remain in `index.yaml`) and let ArgoCD sync.
 
 ## Migrating an app from app-template
 
@@ -295,7 +301,7 @@ In the app's `.k8s`:
    ```
 
 3. Every overlay's `helmCharts` entry: `name: ghost-app`,
-   `repo: oci://ghcr.io/tryghost/charts`, `version: <release>`.
+   `repo: https://tryghost.github.io/pro-helm-charts`, `version: <release>`.
 4. If the app has a preview overlay with a `values.hot-reload.yaml`: delete it
    and its `additionalValuesFiles` entry, and add to `values.preview.yaml`:
 
