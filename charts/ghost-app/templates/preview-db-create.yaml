@@ -43,8 +43,8 @@ spec:
             - -c
             - |
               set -eu
-              case "$PR_NUMBER" in '' | *[!0-9]*) echo "bad PR_NUMBER: $PR_NUMBER" >&2; exit 1;; esac
+              case "$GITHUB_PR_NUMBER" in '' | *[!0-9]*) echo "bad GITHUB_PR_NUMBER: $GITHUB_PR_NUMBER" >&2; exit 1;; esac
               mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASS" \
-                -e "CREATE DATABASE IF NOT EXISTS \`${APP_NAME}_preview_${PR_NUMBER}\` CHARACTER SET utf8mb4"
-              echo "created ${APP_NAME}_preview_${PR_NUMBER}"
+                -e "CREATE DATABASE IF NOT EXISTS \`${APP_NAME}_preview_${GITHUB_PR_NUMBER}\` CHARACTER SET utf8mb4"
+              echo "created ${APP_NAME}_preview_${GITHUB_PR_NUMBER}"
 {{- end }}

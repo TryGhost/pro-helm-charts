@@ -31,7 +31,7 @@ git-sync env (git-sync reads GITSYNC_* when the flag is not given):
   - GITSYNC_REPO from the pod annotation stamped by the pull-request
     ApplicationSet, unless hotReload.repo is set (then passed as --repo).
   - GITSYNC_REF from the pod's pull-request label, unless hotReload.ref is set.
-    $(APP_PR_NUMBER) is expanded by the kubelet (dependent env var expansion),
+    $(GITHUB_PR_NUMBER) is expanded by the kubelet (dependent env var expansion),
     which only works for vars defined earlier; bjw-s emits env alphabetically,
     so the helper var must sort before GITSYNC_REF.
 */}}
@@ -46,11 +46,11 @@ GITSYNC_REPO:
 {{- if $hr.ref }}
 GITSYNC_REF: {{ $hr.ref | quote }}
 {{- else }}
-APP_PR_NUMBER:
+GITHUB_PR_NUMBER:
   valueFrom:
     fieldRef:
       fieldPath: metadata.labels['{{ $hr.pullRequestLabel }}']
-GITSYNC_REF: refs/pull/$(APP_PR_NUMBER)/head
+GITSYNC_REF: refs/pull/$(GITHUB_PR_NUMBER)/head
 {{- end }}
 {{- end -}}
 

@@ -40,6 +40,15 @@ previewDatabase:
   secretName: app-db-secrets
 ```
 
+### Automatic env injection
+
+Every container and initContainer gets `APP_NAME` (the pod's namespace —
+namespace == app by convention) and `GITHUB_PR_NUMBER` (the `pull-request`
+label the pull-request ApplicationSet stamps on preview pods; empty
+elsewhere) via the downward API, so values can reference `$(APP_NAME)` /
+`$(GITHUB_PR_NUMBER)` directly (e.g. a per-PR database name) without
+downward-API boilerplate. User-declared env with the same name wins.
+
 ### Secret injection
 
 `secretsInjection` is the Helm version of the k8s repo's

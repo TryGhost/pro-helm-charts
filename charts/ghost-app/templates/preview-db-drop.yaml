@@ -34,8 +34,8 @@ spec:
             - -c
             - |
               set -eu
-              case "$PR_NUMBER" in '' | *[!0-9]*) echo "refusing to drop: bad PR_NUMBER '$PR_NUMBER'" >&2; exit 1;; esac
+              case "$GITHUB_PR_NUMBER" in '' | *[!0-9]*) echo "refusing to drop: bad GITHUB_PR_NUMBER '$GITHUB_PR_NUMBER'" >&2; exit 1;; esac
               mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASS" \
-                -e "DROP DATABASE IF EXISTS \`${APP_NAME}_preview_${PR_NUMBER}\`"
-              echo "dropped ${APP_NAME}_preview_${PR_NUMBER}"
+                -e "DROP DATABASE IF EXISTS \`${APP_NAME}_preview_${GITHUB_PR_NUMBER}\`"
+              echo "dropped ${APP_NAME}_preview_${GITHUB_PR_NUMBER}"
 {{- end }}

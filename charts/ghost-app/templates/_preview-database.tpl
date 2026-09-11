@@ -18,7 +18,7 @@ neither. It only reads the label back through a fieldRef.
 {{/*
 Env shared by the create and drop containers: connection details from the
 app-db-secrets Secret, APP_NAME from the namespace (app name == namespace)
-and PR_NUMBER from the pod label the ApplicationSet stamps.
+and GITHUB_PR_NUMBER from the pod label the ApplicationSet stamps.
 */}}
 {{- define "ghost-app.previewDatabase.env" -}}
 {{- $pd := .Values.previewDatabase -}}
@@ -46,7 +46,7 @@ and PR_NUMBER from the pod label the ApplicationSet stamps.
   valueFrom:
     fieldRef:
       fieldPath: metadata.namespace
-- name: PR_NUMBER
+- name: GITHUB_PR_NUMBER
   valueFrom:
     fieldRef:
       fieldPath: metadata.labels['{{ $pd.pullRequestLabel }}']

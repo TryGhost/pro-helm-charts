@@ -21,5 +21,8 @@ global:
 {{- $_ := mergeOverwrite .Values (include "ghost-app.hotReload.values" . | fromYaml) -}}
 {{- end }}
 
+{{- /* After hotReload so the git-sync sidecar's own env is respected too */ -}}
+{{- $_ := mergeOverwrite .Values (include "ghost-app.envInjection.values" . | fromYaml) -}}
+
 {{/* Render the templates */}}
 {{ include "bjw-s.common.loader.generate" . }}
