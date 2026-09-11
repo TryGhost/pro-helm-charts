@@ -1,8 +1,14 @@
-# Point the app and its migrations at the per-PR database (name assembled
-# from the namespace + the pull-request label the ApplicationSet stamps).
-# Credentials stay the cluster user from app-db-secrets — only the database
-# name differs from staging. k8s-app injects APP_NAME and GITHUB_PR_NUMBER
-# into every container; they sort before db__* so the $() expansion works.
+# Render-time preview facts: gitops-sync fills __GITHUB_PR_NUMBER__ when
+# snapshotting the preview branch. preview.prNumber drives the injected
+# GITHUB_PR_NUMBER env var, the pull-request pod label, hotReload's git ref
+# and previewDatabase's database name.
+preview:
+  prNumber: __GITHUB_PR_NUMBER__
+
+# Point the app and its migrations at the per-PR database. Credentials stay
+# the cluster user from app-db-secrets — only the database name differs from
+# staging. k8s-app injects APP_NAME and GITHUB_PR_NUMBER into every
+# container; they sort before db__* so the $() expansion works.
 controllers:
   main:
     containers:
@@ -33,9 +39,8 @@ route:
 # init container + sidecar, the /workspace emptyDir, the pinned known_hosts
 # ConfigMap and the SSH-key-only Secret projection, and runs `pnpm dev`
 # (nodemon, --legacy-watch) against the synced checkout.
-# Repository and ref come from the pod at runtime: the pull-request
-# ApplicationSet stamps the ghost.org/git-repo annotation and the pull-request
-# label on every preview pod.
+# Repository and ref are render-time literals derived from preview.prNumber
+# and the release namespace (git@github.com:<owner>/<namespace>.git).
 hotReload:
   enabled: true
 

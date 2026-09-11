@@ -39,7 +39,9 @@ needed.
 */}}
 {{- define "k8s-app.hotReload.gitSyncEnv" -}}
 {{- $hr := .Values.hotReload -}}
+{{- if not $hr.repo }}
 GITSYNC_REPO: {{ include "k8s-app.preview.gitRepo" . | quote }}
+{{- end }}
 {{- if $hr.ref }}
 GITSYNC_REF: {{ $hr.ref | quote }}
 {{- else if .Values.preview.prNumber }}

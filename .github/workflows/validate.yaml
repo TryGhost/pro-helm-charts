@@ -147,11 +147,12 @@ jobs:
           [ "$(yq '.image' <<<"$gs")" = "$(yq '.hotReload.gitSync.image.repository + ":" + .hotReload.gitSync.image.tag' "$CHART/values.yaml")" ]
           yq '.args[]' <<<"$gs" | grep -cx -- '--period=2s'
           ! yq '.args[]' <<<"$gs" | grep -c -- '--repo='
-          [ "$(yq '.env[] | select(.name=="GITSYNC_REPO") | .valueFrom.fieldRef.fieldPath' <<<"$gs")" = "metadata.annotations['ghost.org/git-repo']" ]
-          [ "$(yq '.env[] | select(.name=="GITSYNC_REF") | .value' <<<"$gs")" = 'refs/pull/$(GITHUB_PR_NUMBER)/head' ]
-          [ "$(yq '.env[] | select(.name=="GITHUB_PR_NUMBER") | .valueFrom.fieldRef.fieldPath' <<<"$gs")" = "metadata.labels['pull-request']" ]
+          # 0.4.0: repo and ref are render-time literals (gitops-sync fills the
+          # __GITHUB_PR_NUMBER__ token; the example keeps it unsubstituted)
+          [ "$(yq '.env[] | select(.name=="GITSYNC_REPO") | .value' <<<"$gs")" = "git@github.com:TryGhost/myapp.git" ]
+          [ "$(yq '.env[] | select(.name=="GITSYNC_REF") | .value' <<<"$gs")" = 'refs/pull/__GITHUB_PR_NUMBER__/head' ]
+          [ "$(yq '.env[] | select(.name=="GITHUB_PR_NUMBER") | .value' <<<"$gs")" = "__GITHUB_PR_NUMBER__" ]
           ! yq '.args[]' <<<"$gs" | grep -c -- '--ref='
-          # kubelet only expands $(VAR) for vars defined earlier; bjw-s sorts env alphabetically
           [ "$(yq '.env[].name' <<<"$gs" | tr '\n' ' ')" = "APP_NAME GITHUB_PR_NUMBER GITSYNC_REF GITSYNC_REPO " ]
           echo "explicit repo/ref override"
           ov=$(helm template myapp "$CHART" -n myapp -f examples/myapp/values.yaml -f examples/myapp/values.preview.yaml --set hotReload.repo=git@github.com:TryGhost/Daisy.js.git --set hotReload.ref=refs/heads/main | yq 'select(.kind=="Deployment") | .spec.template.spec.containers[] | select(.name=="git-sync")')
@@ -178,8 +179,11 @@ jobs:
           [ "$(yq '.env[] | select(.name=="db__connection__database") | .value' <<<"$main")" = '$(APP_NAME)_preview_$(GITHUB_PR_NUMBER)' ]
           echo "APP_NAME / GITHUB_PR_NUMBER injected into every container, sorted before consumers"
           [ "$(yq '.env[0].name + " " + .env[1].name' <<<"$main")" = "APP_NAME GITHUB_PR_NUMBER" ]
-          [ "$(yq '.env[] | select(.name=="APP_NAME") | .valueFrom.fieldRef.fieldPath' <<<"$main")" = "metadata.namespace" ]
-          [ "$(yq '.spec.template.spec.initContainers[] | select(.name=="migrate") | .env[] | select(.name=="GITHUB_PR_NUMBER") | .valueFrom.fieldRef.fieldPath' <<<"$dep")" = "metadata.labels['pull-request']" ]
+          [ "$(yq '.env[] | select(.name=="APP_NAME") | .value' <<<"$main")" = "myapp" ]
+          [ "$(yq '.spec.template.spec.initContainers[] | select(.name=="migrate") | .env[] | select(.name=="GITHUB_PR_NUMBER") | .value' <<<"$dep")" = "__GITHUB_PR_NUMBER__" ]
+          echo "pull-request pod label and default pull secret from chart"
+          [ "$(yq '.spec.template.metadata.labels["pull-request"]' <<<"$dep")" = "__GITHUB_PR_NUMBER__" ]
+          [ "$(yq '.spec.template.spec.imagePullSecrets[0].name' <<<"$dep")" = "ghost" ]
           [ "$(yq -N 'select(.kind=="ConfigMap") | .metadata.name' "$f" | sort | tr '\n' ' ')" = "myapp-config myapp-git-sync-hosts " ]
           [ "$(yq 'select(.kind=="HTTPRoute") | .spec.hostnames[0]' "$f")" = "myapp-__GITHUB_PR_NUMBER__.ghostinfra.net" ]
 
@@ -211,20 +215,19 @@ jobs:
             [ "$(yq '.spec.template.spec.containers[0].image' <<<"$job")" = "mysql:8.4" ]
             [ "$(yq '.spec.template.spec.containers[0].env[] | select(.name=="DB_HOST") | .valueFrom.secretKeyRef | .name + "/" + .key' <<<"$job")" = "app-db-secrets/host" ]
             [ "$(yq '.spec.template.spec.containers[0].env[] | select(.name=="DB_PASS") | .valueFrom.secretKeyRef | .name + "/" + .key' <<<"$job")" = "app-db-secrets/password" ]
-            [ "$(yq '.spec.template.spec.containers[0].env[] | select(.name=="APP_NAME") | .valueFrom.fieldRef.fieldPath' <<<"$job")" = "metadata.namespace" ]
-            [ "$(yq '.spec.template.spec.containers[0].env[] | select(.name=="GITHUB_PR_NUMBER") | .valueFrom.fieldRef.fieldPath' <<<"$job")" = "metadata.labels['pull-request']" ]
+            [ "$(yq '.spec.template.spec.containers[0].env[] | select(.name=="APP_NAME") | .value' <<<"$job")" = "myapp" ]
+            [ "$(yq '.spec.template.spec.containers[0].env[] | select(.name=="GITHUB_PR_NUMBER") | .value' <<<"$job")" = "__GITHUB_PR_NUMBER__" ]
             yq '.spec.template.spec.containers[0].command[2]' <<<"$job" | grep -cF "case \"\$GITHUB_PR_NUMBER\" in '' | *[!0-9]*)"
           done
           yq '.spec.template.spec.containers[0].command[2]' <<<"$create" | grep -cF 'CREATE DATABASE IF NOT EXISTS \`${APP_NAME}_preview_${GITHUB_PR_NUMBER}\` CHARACTER SET utf8mb4'
           yq '.spec.template.spec.containers[0].command[2]' <<<"$drop" | grep -cF 'DROP DATABASE IF EXISTS \`${APP_NAME}_preview_${GITHUB_PR_NUMBER}\`'
 
-          echo "custom secret name and label"
+          echo "custom secret name and key"
           c=$(helm template myapp "$CHART" -n myapp -f examples/myapp/values.yaml -f examples/myapp/values.preview.yaml \
-                --set previewDatabase.secretName=other-db --set previewDatabase.keys.password=pw --set previewDatabase.pullRequestLabel=pr \
+                --set previewDatabase.secretName=other-db --set previewDatabase.keys.password=pw \
               | yq 'select(.kind=="Job" and .metadata.name=="myapp-create-preview-db") | .spec.template.spec.containers[0].env')
           [ "$(yq '.[] | select(.name=="DB_USER") | .valueFrom.secretKeyRef.name' <<<"$c")" = "other-db" ]
           [ "$(yq '.[] | select(.name=="DB_PASS") | .valueFrom.secretKeyRef.key' <<<"$c")" = "pw" ]
-          [ "$(yq '.[] | select(.name=="GITHUB_PR_NUMBER") | .valueFrom.fieldRef.fieldPath' <<<"$c")" = "metadata.labels['pr']" ]
 
 
   version-bump:
