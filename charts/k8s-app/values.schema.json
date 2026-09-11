@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/TryGhost/pro-helm-charts/blob/main/charts/ghost-app/values.schema.json",
+  "$id": "https://github.com/TryGhost/pro-helm-charts/blob/main/charts/k8s-app/values.schema.json",
   "type": "object",
   "properties": {
     "global": {
@@ -12417,7 +12417,7 @@
             "required": [
               "type"
             ],
-            "$comment": "oneOf enforces that at least one of name/identifier is present. dependentSchemas enforces mutual exclusion with a targeted error when both are set. Both are needed \u2014 do not simplify to oneOf alone.",
+            "$comment": "oneOf enforces that at least one of name/identifier is present. dependentSchemas enforces mutual exclusion with a targeted error when both are set. Both are needed — do not simplify to oneOf alone.",
             "oneOf": [
               {
                 "required": [
@@ -12490,7 +12490,7 @@
             "required": [
               "type"
             ],
-            "$comment": "oneOf enforces that at least one of name/identifier is present. dependentSchemas enforces mutual exclusion with a targeted error when both are set. Both are needed \u2014 do not simplify to oneOf alone.",
+            "$comment": "oneOf enforces that at least one of name/identifier is present. dependentSchemas enforces mutual exclusion with a targeted error when both are set. Both are needed — do not simplify to oneOf alone.",
             "oneOf": [
               {
                 "required": [
@@ -13001,7 +13001,7 @@
       "additionalProperties": false
     },
     "rawResources": {
-      "description": "Allows for the inclusion of raw Kubernetes resources that are not supported by the chart otherwise\u200b",
+      "description": "Allows for the inclusion of raw Kubernetes resources that are not supported by the chart otherwise​",
       "type": "object",
       "additionalProperties": {
         "type": "object",
@@ -13126,7 +13126,7 @@
         "refreshInterval": {
           "description": "ESO refresh interval for both ExternalSecrets.",
           "type": "string",
-          "pattern": "^[0-9]+(ns|us|\u00b5s|ms|s|m|h)$",
+          "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h)$",
           "default": "5m"
         },
         "store": {
@@ -13387,6 +13387,6 @@
       }
     }
   },
-  "title": "ghost-app values",
-  "description": "bjw-s common library values (embedded verbatim from the locked common dependency) plus the options ghost-app adds: secretsInjection, hotReload and previewDatabase."
+  "title": "k8s-app values",
+  "description": "bjw-s common library values (embedded verbatim from the locked common dependency) plus the options k8s-app adds: secretsInjection, hotReload and previewDatabase."
 }

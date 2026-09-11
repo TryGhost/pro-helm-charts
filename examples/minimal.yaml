@@ -1,4 +1,4 @@
-# Smallest useful ghost-app release: one Deployment + Service, no secret
+# Smallest useful k8s-app release: one Deployment + Service, no secret
 # injection, no hot reload. Plain bjw-s values.
 controllers:
   main:

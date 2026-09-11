@@ -1,4 +1,4 @@
-ghost-app
+k8s-app
 Copyright (c) Ghost Foundation
 
 This chart depends on, and is derived in part from, the bjw-s-labs helm-charts

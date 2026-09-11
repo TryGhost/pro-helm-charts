@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 env:
-  CHART: charts/ghost-app
+  CHART: charts/k8s-app
   # Pinned so local and CI results match; Renovate does not manage this line.
   HELM_VERSION: v4.1.4
 
@@ -41,10 +41,10 @@ jobs:
         run: |
           archive=$(ls "$CHART"/charts/common-*.tgz)
           tar -xzOf "$archive" common/values.schema.json \
-            | jq --slurpfile ext "$CHART/schemas/ghost-app.json" '
-                .["$id"] = "https://github.com/TryGhost/pro-helm-charts/blob/main/charts/ghost-app/values.schema.json"
-                | .title = "ghost-app values"
-                | .description = "bjw-s common library values (embedded verbatim from the locked common dependency) plus the options ghost-app adds: secretsInjection, hotReload and previewDatabase."
+            | jq --slurpfile ext "$CHART/schemas/k8s-app.json" '
+                .["$id"] = "https://github.com/TryGhost/pro-helm-charts/blob/main/charts/k8s-app/values.schema.json"
+                | .title = "k8s-app values"
+                | .description = "bjw-s common library values (embedded verbatim from the locked common dependency) plus the options k8s-app adds: secretsInjection, hotReload and previewDatabase."
                 | .properties += $ext[0]' > /tmp/expected.schema.json
           if ! diff -q /tmp/expected.schema.json "$CHART/values.schema.json"; then
             echo "::error::values.schema.json is stale. Regenerate it with the command in README.md (Updating common) and commit." >&2
@@ -252,7 +252,7 @@ jobs:
             echo "::error file=$CHART/Chart.yaml::$CHART changed but version is still $new. Bump 'version' (releases are immutable; every releasable change needs a new version)." >&2
             exit 1
           fi
-          if gh release view "ghost-app-$new" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "::error file=$CHART/Chart.yaml::ghost-app-$new is already released and releases are never overwritten. Pick a new version." >&2
+          if gh release view "k8s-app-$new" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error file=$CHART/Chart.yaml::k8s-app-$new is already released and releases are never overwritten. Pick a new version." >&2
             exit 1
           fi

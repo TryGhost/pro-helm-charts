@@ -1,7 +1,7 @@
 # Point the app and its migrations at the per-PR database (name assembled
 # from the namespace + the pull-request label the ApplicationSet stamps).
 # Credentials stay the cluster user from app-db-secrets — only the database
-# name differs from staging. ghost-app injects APP_NAME and GITHUB_PR_NUMBER
+# name differs from staging. k8s-app injects APP_NAME and GITHUB_PR_NUMBER
 # into every container; they sort before db__* so the $() expansion works.
 controllers:
   main:

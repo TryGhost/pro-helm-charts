@@ -16,7 +16,7 @@ User-declared env always wins: for map-form env only missing keys are added
 (deep merge), for list-form env the fragment rebuilds the full list with the
 injected entries prepended only when absent (mergeOverwrite replaces lists).
 */}}
-{{- define "ghost-app.envInjection.values" -}}
+{{- define "k8s-app.envInjection.values" -}}
 {{- $injected := dict
       "APP_NAME" .Release.Namespace
       "GITHUB_PR_NUMBER" (.Values.preview.prNumber | default "" | toString) -}}

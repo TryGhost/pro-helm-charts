@@ -6,14 +6,14 @@ Helm repository `https://tryghost.github.io/pro-helm-charts`. ArgoCD and
 
 | Chart | What it is |
 |---|---|
-| [`charts/ghost-app`](charts/ghost-app) | Our replacement for [bjw-s `app-template`](https://bjw-s-labs.github.io/helm-charts/docs/app-template/): the upstream `common` library (unmodified, pinned in `Chart.lock`) plus optional External Secrets injection and git-sync hot reload. |
+| [`charts/k8s-app`](charts/k8s-app) | Our replacement for [bjw-s `app-template`](https://bjw-s-labs.github.io/helm-charts/docs/app-template/): the upstream `common` library (unmodified, pinned in `Chart.lock`) plus optional External Secrets injection and git-sync hot reload. |
 
 This is a standalone repository, not a fork of bjw-s-labs/helm-charts. Upstream
-code is used under Apache-2.0; see `charts/ghost-app/NOTICE`.
+code is used under Apache-2.0; see `charts/k8s-app/NOTICE`.
 
-## ghost-app
+## k8s-app
 
-`ghost-app` accepts every top-level value bjw-s `app-template` accepts
+`k8s-app` accepts every top-level value bjw-s `app-template` accepts
 (`controllers`, `service`, `persistence`, `configMaps`, `route`, ...) with the
 same semantics, because it hands the values to the same `common` library the
 same way app-template does (`templates/common.yaml` is adapted from
@@ -33,7 +33,7 @@ hotReload:
   enabled: false        # git-sync init container + sidecar, dev runner in the app container
   repo: ""              # default: read from the pod's ghost.org/git-repo annotation (set by the ApplicationSet)
   ref: ""               # default: refs/pull/<n>/head, <n> read from the pod's pull-request label
-  # see charts/ghost-app/values.yaml for everything else
+  # see charts/k8s-app/values.yaml for everything else
 
 previewDatabase:
   enabled: false        # per-PR MySQL database: create Job (wave 0) + drop Job (PostDelete hook)
@@ -168,7 +168,7 @@ app's preview values. Example:
 ```yaml
 # kustomize helmCharts entry (ArgoCD with --enable-helm)
 helmCharts:
-  - name: ghost-app
+  - name: k8s-app
     repo: https://tryghost.github.io/pro-helm-charts
     version: 0.2.0
     releaseName: myapp
@@ -182,26 +182,26 @@ or plain Helm:
 
 ```sh
 helm repo add ghost https://tryghost.github.io/pro-helm-charts
-helm install myapp ghost/ghost-app --version 0.2.0 -n myapp -f values.yaml
-helm show values ghost/ghost-app --version 0.2.0
+helm install myapp ghost/k8s-app --version 0.2.0 -n myapp -f values.yaml
+helm show values ghost/k8s-app --version 0.2.0
 ```
 
 Every published release bundles the `common` version from its `Chart.lock`, so
 consumers never add the bjw-s repository. Releases are also listed on the
-GitHub releases page as `ghost-app-<version>` with the `.tgz` attached.
+GitHub releases page as `k8s-app-<version>` with the `.tgz` attached.
 
 ## Local development
 
 ```sh
 helm repo add bjw-s https://bjw-s-labs.github.io/helm-charts
-helm dependency build charts/ghost-app          # fetches charts/common-<ver>.tgz from Chart.lock
-helm lint --strict charts/ghost-app -f examples/minimal.yaml
-helm template app charts/ghost-app -n app -f examples/app-db-secrets.yaml
-helm template myapp charts/ghost-app -n myapp \
+helm dependency build charts/k8s-app          # fetches charts/common-<ver>.tgz from Chart.lock
+helm lint --strict charts/k8s-app -f examples/minimal.yaml
+helm template app charts/k8s-app -n app -f examples/app-db-secrets.yaml
+helm template myapp charts/k8s-app -n myapp \
   -f examples/myapp/values.yaml -f examples/myapp/values.preview.yaml
 ```
 
-`charts/ghost-app/charts/` (downloaded archives) is git-ignored; `Chart.yaml`
+`charts/k8s-app/charts/` (downloaded archives) is git-ignored; `Chart.yaml`
 and `Chart.lock` are committed. Use `helm dependency update` only when changing
 `Chart.yaml` dependencies, and commit the new lock.
 
@@ -212,7 +212,7 @@ first job of every release:
 
 - `helm dependency build` (fails if `Chart.yaml` and `Chart.lock` disagree).
 - `values.schema.json` must equal the locked common schema plus
-  `schemas/ghost-app.json` (see *Updating common*).
+  `schemas/k8s-app.json` (see *Updating common*).
 - `helm lint --strict` with each example (minimal, app-secrets,
   app-db-secrets, and the full `myapp` staging/production/preview set) and a
   set of values the schema must reject.
@@ -221,11 +221,11 @@ first job of every release:
   annotation, the untouched `{{ (.db | fromJson).* }}` ESO expressions, the
   git-sync arguments (`--period=2s`, ref, repo), the `pnpm dev` command, and
   that the SSH key is projected only into git-sync containers.
-- On PRs: `charts/ghost-app` changes require a new `version` that has not been
+- On PRs: `charts/k8s-app` changes require a new `version` that has not been
   released.
 
 Rendering checks prove the manifests are what we expect, and an app-template
-deployment migrated to ghost-app renders the same resources (only
+deployment migrated to k8s-app renders the same resources (only
 `helm.sh/chart` labels differ). They do not prove runtime behaviour: ESO
 actually finding secrets, git-sync authenticating, the dev runner restarting.
 Verify those on a staging/preview deployment.
@@ -235,15 +235,15 @@ Verify those on a staging/preview deployment.
 Helm validates only the top-level chart's `values.schema.json` against the
 top-level values; a subchart's schema is checked against that subchart's own
 values, which for a library dependency are empty. Upstream app-template solves
-this by copying common's schema verbatim, and ghost-app does the same and then
+this by copying common's schema verbatim, and k8s-app does the same and then
 adds its own properties: `values.schema.json` = common's schema +
-`schemas/ghost-app.json`. Unknown keys under `secretsInjection`/`hotReload`
+`schemas/k8s-app.json`. Unknown keys under `secretsInjection`/`hotReload`
 and invalid bjw-s values are both rejected.
 
 ## Releases
 
 Releases are immutable: a chart version, once published, is never rebuilt or
-overwritten. Every releasable change to `charts/ghost-app` therefore needs a
+overwritten. Every releasable change to `charts/k8s-app` therefore needs a
 new `version` in `Chart.yaml` (semver: patch for fixes, minor for backwards
 compatible additions, major when values or rendered resources change
 incompatibly). CI blocks PRs that change the chart without a bump or reuse a
@@ -253,21 +253,21 @@ releases* enabled, so a published release and its `.tgz` cannot be altered.
 
 Merging to `main` with a chart change runs `.github/workflows/release.yaml`:
 validate, `helm dependency build` (bundling the locked common),
-`helm package`, `gh release create ghost-app-<version>` with the `.tgz`
+`helm package`, `gh release create k8s-app-<version>` with the `.tgz`
 attached, and `helm repo index --merge` to add the entry to `index.yaml` on the
 `gh-pages` branch, pointing at the release asset. Old entries are kept, so apps
 can keep pinning older versions. Only `GITHUB_TOKEN` is used
 (`contents: write` at job level); no PAT or extra secret.
 `helm/chart-releaser` is deliberately not used: it uploads the asset after
 creating the release, which immutable releases reject (that is how the empty
-`ghost-app-0.1.1` release came to exist).
+`k8s-app-0.1.1` release came to exist).
 
 ### Publishing the first release (one-time setup)
 
 1. The repository must be **public** (GitHub Pages is not available for
    private repositories outside Enterprise Cloud). It is.
 2. Push `main`. The release workflow creates the `gh-pages` branch itself if
-   it is missing, publishes `ghost-app-<version>` and writes `index.yaml`.
+   it is missing, publishes `k8s-app-<version>` and writes `index.yaml`.
 3. Enable Pages once, as repo admin: *Settings → Pages → Build and
    deployment → Source: Deploy from a branch → Branch: `gh-pages` / `/ (root)`*,
    or:
@@ -286,7 +286,7 @@ creating the release, which immutable releases reject (that is how the empty
 
    ```sh
    helm repo add ghost https://tryghost.github.io/pro-helm-charts
-   helm search repo ghost/ghost-app --versions
+   helm search repo ghost/k8s-app --versions
    ```
 
 6. Install [Renovate](https://github.com/apps/renovate) on the repository (the
@@ -297,35 +297,35 @@ on the repo-server runs a plain anonymous `helm pull` against the Pages URL.
 
 ## Updating common (Renovate)
 
-Renovate's native `helmv3` manager watches `charts/ghost-app/Chart.yaml` and
+Renovate's native `helmv3` manager watches `charts/k8s-app/Chart.yaml` and
 opens a PR when bjw-s publishes a new `common`; `helmUpdateSubChartArchives`
 makes it refresh `Chart.lock` too (archives stay git-ignored). No regex
 manager is involved. Every Renovate PR is review-required; nothing automerges.
 
-What Renovate cannot do is decide what the change means for ghost-app's
+What Renovate cannot do is decide what the change means for k8s-app's
 public API, so the PR body carries a checklist:
 
 1. Regenerate the schema so CI passes:
 
    ```sh
    helm repo add bjw-s https://bjw-s-labs.github.io/helm-charts
-   helm dependency build charts/ghost-app
-   tar -xzOf charts/ghost-app/charts/common-*.tgz common/values.schema.json \
-     | jq --slurpfile ext charts/ghost-app/schemas/ghost-app.json '
-         .["$id"] = "https://github.com/TryGhost/pro-helm-charts/blob/main/charts/ghost-app/values.schema.json"
-         | .title = "ghost-app values"
-         | .description = "bjw-s common library values (embedded verbatim from the locked common dependency) plus the options ghost-app adds: secretsInjection, hotReload and previewDatabase."
-         | .properties += $ext[0]' > charts/ghost-app/values.schema.json
+   helm dependency build charts/k8s-app
+   tar -xzOf charts/k8s-app/charts/common-*.tgz common/values.schema.json \
+     | jq --slurpfile ext charts/k8s-app/schemas/k8s-app.json '
+         .["$id"] = "https://github.com/TryGhost/pro-helm-charts/blob/main/charts/k8s-app/values.schema.json"
+         | .title = "k8s-app values"
+         | .description = "bjw-s common library values (embedded verbatim from the locked common dependency) plus the options k8s-app adds: secretsInjection, hotReload and previewDatabase."
+         | .properties += $ext[0]' > charts/k8s-app/values.schema.json
    ```
 
-2. Pick the ghost-app version. For minor/patch common updates Renovate
-   already bumps ghost-app's patch version (`bumpVersion: patch`); raise it to
+2. Pick the k8s-app version. For minor/patch common updates Renovate
+   already bumps k8s-app's patch version (`bumpVersion: patch`); raise it to
    minor if the update exposes new features you want to advertise. For
    **major** common updates Renovate deliberately does not bump anything and
    labels the PR `breaking-upstream`: that PR is the compatibility PR. Read
    the upstream upgrade guide, render `examples/myapp` against the old and
    new version, and either absorb small differences in `templates/` (minor
-   bump) or release a new ghost-app major with migration notes in this README.
+   bump) or release a new k8s-app major with migration notes in this README.
    The wrapper does not eliminate upstream breaking changes; it gives one
    place to handle them.
 
@@ -336,7 +336,7 @@ are updated by Renovate the same way (review-required, patch bump reminder).
 
 ## Versioning and adoption
 
-Apps pin a ghost-app version in their `helmCharts` entry and upgrade
+Apps pin a k8s-app version in their `helmCharts` entry and upgrade
 independently; each release bundles its own common, so upgrading one app never
 forces another. To roll back, set `version:` back to the previous release
 (all versions remain in `index.yaml`) and let ArgoCD sync.
@@ -362,7 +362,7 @@ In the app's `.k8s`:
      database: true   # only for apps with a Terraform-managed database
    ```
 
-3. Every overlay's `helmCharts` entry: `name: ghost-app`,
+3. Every overlay's `helmCharts` entry: `name: k8s-app`,
    `repo: https://tryghost.github.io/pro-helm-charts`, `version: <release>`.
 4. If the app has a preview overlay with a `values.hot-reload.yaml`: delete it
    and its `additionalValuesFiles` entry, and add to `values.preview.yaml`:

@@ -1,5 +1,5 @@
 apiVersion: v2
-name: ghost-app
+name: k8s-app
 description: >-
   Ghost's application chart: the bjw-s common library plus optional External
   Secrets injection (app-secrets / app-db-secrets) and git-sync hot reload for

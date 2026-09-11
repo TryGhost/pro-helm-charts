@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=values.schema.json
 #
-# ghost-app values.
+# k8s-app values.
 #
 # Everything the bjw-s common library understands (controllers, service,
 # persistence, configMaps, route, ...) is accepted at the top level exactly as
@@ -8,7 +8,7 @@
 # https://bjw-s-labs.github.io/helm-charts/docs/app-template/
 #
 # Like upstream app-template, this file intentionally declares only the
-# options ghost-app adds. Upstream keeps its values.yaml empty for the same
+# options k8s-app adds. Upstream keeps its values.yaml empty for the same
 # reason: the library defaults are merged in at render time.
 
 # -- External Secrets injection. Replaces the k8s repo's

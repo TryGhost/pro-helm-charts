@@ -186,14 +186,6 @@
             "pattern": "^/"
           }
         }
-      },
-      "pullRequestLabel": {
-        "type": "string",
-        "minLength": 1
-      },
-      "repoAnnotation": {
-        "type": "string",
-        "minLength": 1
       }
     }
   },
@@ -250,10 +242,6 @@
           }
         }
       },
-      "pullRequestLabel": {
-        "type": "string",
-        "minLength": 1
-      },
       "backoffLimit": {
         "type": "integer",
         "minimum": 0
@@ -264,6 +252,28 @@
       },
       "resources": {
         "type": "object"
+      }
+    }
+  },
+  "preview": {
+    "description": "Per-render preview facts, set by gitops-sync when snapshotting a PR preview. Empty outside previews.",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "prNumber": {
+        "description": "Pull request number (render-time literal).",
+        "type": [
+          "string",
+          "integer"
+        ]
+      },
+      "gitRepo": {
+        "description": "SSH clone URL for hotReload; empty = derived from owner + release namespace.",
+        "type": "string"
+      },
+      "owner": {
+        "description": "GitHub owner used when deriving gitRepo.",
+        "type": "string"
       }
     }
   }

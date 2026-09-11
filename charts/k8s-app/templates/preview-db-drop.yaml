@@ -9,9 +9,9 @@ gone.
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "ghost-app.previewDatabase.jobName" (dict "Release" .Release "suffix" "drop-preview-db") }}
+  name: {{ include "k8s-app.previewDatabase.jobName" (dict "Release" .Release "suffix" "drop-preview-db") }}
   labels:
-    {{- include "ghost-app.labels" . | nindent 4 }}
+    {{- include "k8s-app.labels" . | nindent 4 }}
   annotations:
     argocd.argoproj.io/hook: PostDelete
     argocd.argoproj.io/hook-delete-policy: HookSucceeded
@@ -23,12 +23,12 @@ spec:
       restartPolicy: Never
       containers:
         - name: drop
-          image: {{ include "ghost-app.previewDatabase.image" . }}
+          image: {{ include "k8s-app.previewDatabase.image" . }}
           {{- with .Values.previewDatabase.resources }}
           resources: {{ toJson . }}
           {{- end }}
           env:
-            {{- include "ghost-app.previewDatabase.env" . | nindent 12 }}
+            {{- include "k8s-app.previewDatabase.env" . | nindent 12 }}
           command:
             - sh
             - -c

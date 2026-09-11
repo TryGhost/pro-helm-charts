@@ -41,14 +41,14 @@
       ],
       "commitMessageTopic": "bjw-s common library",
       "prBodyNotes": [
-        "### ghost-app release checklist (manual)",
-        "1. Regenerate `charts/ghost-app/values.schema.json` (README: *Updating common*). CI fails until it matches the locked common schema.",
-        "2. Bump `version` in `charts/ghost-app/Chart.yaml`. Renovate bumps **patch** for minor/patch common updates and does **not** bump for major updates: decide yourself whether ghost-app's public values API changed, and use a **major** ghost-app bump with migration notes if it did.",
+        "### k8s-app release checklist (manual)",
+        "1. Regenerate `charts/k8s-app/values.schema.json` (README: *Updating common*). CI fails until it matches the locked common schema.",
+        "2. Bump `version` in `charts/k8s-app/Chart.yaml`. Renovate bumps **patch** for minor/patch common updates and does **not** bump for major updates: decide yourself whether k8s-app's public values API changed, and use a **major** k8s-app bump with migration notes if it did.",
         "3. Read the upstream release notes and upgrade guide linked below; render `examples/scheduler` and compare."
       ]
     },
     {
-      "description": "Minor/patch common updates: Renovate bumps ghost-app's patch version so the PR is releasable as-is (still review-required).",
+      "description": "Minor/patch common updates: Renovate bumps k8s-app's patch version so the PR is releasable as-is (still review-required).",
       "matchManagers": [
         "helmv3"
       ],
@@ -62,7 +62,7 @@
       "bumpVersion": "patch"
     },
     {
-      "description": "Major common updates: compatibility PR. No automatic chart version bump; a human picks the ghost-app version (usually major) and writes the migration notes.",
+      "description": "Major common updates: compatibility PR. No automatic chart version bump; a human picks the k8s-app version (usually major) and writes the migration notes.",
       "matchManagers": [
         "helmv3"
       ],
@@ -75,10 +75,10 @@
       "addLabels": [
         "breaking-upstream"
       ],
-      "commitMessagePrefix": "feat(ghost-app)!:"
+      "commitMessagePrefix": "feat(k8s-app)!:"
     },
     {
-      "description": "git-sync image in ghost-app values.yaml (helm-values manager). No digest pinning: the tag is rendered as image:tag.",
+      "description": "git-sync image in k8s-app values.yaml (helm-values manager). No digest pinning: the tag is rendered as image:tag.",
       "matchManagers": [
         "helm-values"
       ],
@@ -86,7 +86,7 @@
         "registry.k8s.io/git-sync/git-sync"
       ],
       "prBodyNotes": [
-        "Bump `version` in `charts/ghost-app/Chart.yaml` (patch) before merging; CI enforces it. Renovate cannot bump it for values.yaml changes."
+        "Bump `version` in `charts/k8s-app/Chart.yaml` (patch) before merging; CI enforces it. Renovate cannot bump it for values.yaml changes."
       ],
       "pinDigests": false
     },

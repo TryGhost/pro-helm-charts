@@ -6,11 +6,11 @@ pull-request pod label is stamped by the chart's controller defaults from
 preview.prNumber.
 */}}
 
-{{- define "ghost-app.previewDatabase.jobName" -}}
+{{- define "k8s-app.previewDatabase.jobName" -}}
 {{- printf "%s-%s" .Release.Name .suffix -}}
 {{- end -}}
 
-{{- define "ghost-app.previewDatabase.image" -}}
+{{- define "k8s-app.previewDatabase.image" -}}
 {{- printf "%s:%s" .Values.previewDatabase.image.repository .Values.previewDatabase.image.tag -}}
 {{- end -}}
 
@@ -19,7 +19,7 @@ Env shared by the create and drop containers: connection details from the
 app-db-secrets Secret, APP_NAME from the namespace (app name == namespace)
 and GITHUB_PR_NUMBER from preview.prNumber (a render-time literal).
 */}}
-{{- define "ghost-app.previewDatabase.env" -}}
+{{- define "k8s-app.previewDatabase.env" -}}
 {{- $pd := .Values.previewDatabase -}}
 - name: DB_USER
   valueFrom:

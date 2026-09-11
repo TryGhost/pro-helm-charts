@@ -18,15 +18,15 @@ Nothing else in the pod changes: env, envFrom and other volumes stay exactly
 as the app declared them.
 */}}
 
-{{- define "ghost-app.hotReload.checkoutPath" -}}
+{{- define "k8s-app.hotReload.checkoutPath" -}}
 {{- printf "%s/%s" .Values.hotReload.gitSync.root .Values.hotReload.gitSync.link -}}
 {{- end -}}
 
-{{- define "ghost-app.hotReload.sshKey" -}}
+{{- define "k8s-app.hotReload.sshKey" -}}
 {{- default (printf "%s-git-sync-ssh" .Release.Namespace) .Values.hotReload.ssh.key -}}
 {{- end -}}
 
-{{- define "ghost-app.preview.gitRepo" -}}
+{{- define "k8s-app.preview.gitRepo" -}}
 {{- $pv := .Values.preview -}}
 {{- coalesce .Values.hotReload.repo $pv.gitRepo (printf "git@github.com:%s/%s.git" $pv.owner .Release.Namespace) -}}
 {{- end -}}
@@ -37,9 +37,9 @@ ref are literals at render time: gitops-sync passes preview.prNumber (the
 __GITHUB_PR_NUMBER__ token) when snapshotting, so no pod-metadata reads are
 needed.
 */}}
-{{- define "ghost-app.hotReload.gitSyncEnv" -}}
+{{- define "k8s-app.hotReload.gitSyncEnv" -}}
 {{- $hr := .Values.hotReload -}}
-GITSYNC_REPO: {{ include "ghost-app.preview.gitRepo" . | quote }}
+GITSYNC_REPO: {{ include "k8s-app.preview.gitRepo" . | quote }}
 {{- if $hr.ref }}
 GITSYNC_REF: {{ $hr.ref | quote }}
 {{- else if .Values.preview.prNumber }}
@@ -49,7 +49,7 @@ GITSYNC_REF: {{ printf "refs/pull/%s/head" (.Values.preview.prNumber | toString)
 {{- end }}
 {{- end -}}
 
-{{- define "ghost-app.hotReload.gitSyncArgs" -}}
+{{- define "k8s-app.hotReload.gitSyncArgs" -}}
 {{- $hr := .Values.hotReload -}}
 {{- if $hr.repo }}
 - --repo={{ $hr.repo }}
@@ -66,15 +66,15 @@ GITSYNC_REF: {{ printf "refs/pull/%s/head" (.Values.preview.prNumber | toString)
 {{- end }}
 {{- end -}}
 
-{{- define "ghost-app.hotReload.defaultArgs" -}}
+{{- define "k8s-app.hotReload.defaultArgs" -}}
 {{- $hr := .Values.hotReload -}}
-{{- $checkout := include "ghost-app.hotReload.checkoutPath" . -}}
+{{- $checkout := include "k8s-app.hotReload.checkoutPath" . -}}
 - |
   ln -sfn {{ $hr.app.nodeModules }} {{ $hr.workspace }}/node_modules
   exec {{ $hr.app.devCommand }} --legacy-watch --watch {{ $checkout }} --exec 'sh -c "cd {{ $checkout }} && exec {{ $hr.app.run }}"'
 {{- end -}}
 
-{{- define "ghost-app.hotReload.values" -}}
+{{- define "k8s-app.hotReload.values" -}}
 {{- $hr := .Values.hotReload -}}
 {{- $controller := $hr.controller -}}
 {{- $container := $hr.container -}}
@@ -106,9 +106,9 @@ controllers:
         securityContext: {{ $gitSyncSecurityContext | toJson }}
         resources: {{ $hr.gitSync.resources | toJson }}
         env:
-          {{- include "ghost-app.hotReload.gitSyncEnv" . | nindent 10 }}
+          {{- include "k8s-app.hotReload.gitSyncEnv" . | nindent 10 }}
         args:
-          {{- include "ghost-app.hotReload.gitSyncArgs" . | nindent 10 }}
+          {{- include "k8s-app.hotReload.gitSyncArgs" . | nindent 10 }}
           - --one-time
     containers:
       git-sync:
@@ -118,9 +118,9 @@ controllers:
         securityContext: {{ $gitSyncSecurityContext | toJson }}
         resources: {{ $hr.gitSync.resources | toJson }}
         env:
-          {{- include "ghost-app.hotReload.gitSyncEnv" . | nindent 10 }}
+          {{- include "k8s-app.hotReload.gitSyncEnv" . | nindent 10 }}
         args:
-          {{- include "ghost-app.hotReload.gitSyncArgs" . | nindent 10 }}
+          {{- include "k8s-app.hotReload.gitSyncArgs" . | nindent 10 }}
           - --period={{ $hr.gitSync.period }}
           - --max-failures=-1
           # Give the dev runner time to observe the update and stop the old process.
@@ -133,7 +133,7 @@ controllers:
         args: {{ $hr.app.args | toJson }}
         {{- else }}
         args:
-          {{- include "ghost-app.hotReload.defaultArgs" . | nindent 10 }}
+          {{- include "k8s-app.hotReload.defaultArgs" . | nindent 10 }}
         {{- end }}
 configMaps:
   git-sync-hosts:
@@ -153,7 +153,7 @@ persistence:
     name: {{ $hr.ssh.secretName }}
     defaultMode: 0440
     items:
-      - key: {{ include "ghost-app.hotReload.sshKey" . }}
+      - key: {{ include "k8s-app.hotReload.sshKey" . }}
         path: ssh
     advancedMounts:
       {{ $controller }}:
