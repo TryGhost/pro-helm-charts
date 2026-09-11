@@ -71,7 +71,7 @@ hotReload:
   gitSync:
     image:
       repository: registry.k8s.io/git-sync/git-sync
-      tag: v4.4.2
+      tag: v4.7.1
     # -- Polling interval for the sidecar.
     period: 2s
     # -- How long old worktrees are kept so the watcher can stop the old process.
