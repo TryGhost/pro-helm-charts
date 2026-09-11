@@ -88,8 +88,10 @@ hotReload:
     # -- Secret holding the read-only deploy key (by convention the
     # app-secrets Secret created by secretsInjection).
     secretName: app-secrets
-    # -- Key inside that Secret. Defaults to "<release name>-git-sync-ssh",
-    # which matches the Terraform argocd module's convention.
+    # -- Key inside that Secret. Defaults to "<namespace>-git-sync-ssh"
+    # (namespace == app name by convention), matching the Terraform argocd
+    # module: per-PR preview releases are named <app>-<pr>, but the deploy
+    # key is provisioned per app, not per release.
     key: ""
     # -- Pinned SSH host key(s) for the git host (GitHub's published Ed25519
     # key), not a runtime keyscan.

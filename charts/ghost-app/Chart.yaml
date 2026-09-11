@@ -6,7 +6,7 @@ description: >-
   PR previews. A drop-in replacement for bjw-s app-template.
 type: application
 # Bump on every releasable change (CI enforces this and releases are immutable).
-version: 0.2.1
+version: 0.2.2
 kubeVersion: ">=1.28.0-0"
 keywords:
   - ghost

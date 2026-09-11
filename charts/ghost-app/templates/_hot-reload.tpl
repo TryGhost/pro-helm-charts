@@ -23,7 +23,7 @@ as the app declared them.
 {{- end -}}
 
 {{- define "ghost-app.hotReload.sshKey" -}}
-{{- default (printf "%s-git-sync-ssh" .Release.Name) .Values.hotReload.ssh.key -}}
+{{- default (printf "%s-git-sync-ssh" .Release.Namespace) .Values.hotReload.ssh.key -}}
 {{- end -}}
 
 {{/*
