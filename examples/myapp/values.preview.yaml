@@ -1,23 +1,14 @@
 # Point the app and its migrations at the per-PR database (name assembled
 # from the namespace + the pull-request label the ApplicationSet stamps).
 # Credentials stay the cluster user from app-db-secrets — only the database
-# name differs from staging. Env renders alphabetically, so APP_NAME/
-# PR_NUMBER (uppercase sorts first) are defined before the $() expansion
-# that references them.
+# name differs from staging. ghost-app injects APP_NAME and GITHUB_PR_NUMBER
+# into every container; they sort before db__* so the $() expansion works.
 controllers:
   main:
     containers:
       main:
         env: &previewDb
-          APP_NAME:
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.namespace
-          PR_NUMBER:
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.labels['pull-request']
-          db__connection__database: $(APP_NAME)_preview_$(PR_NUMBER)
+          db__connection__database: $(APP_NAME)_preview_$(GITHUB_PR_NUMBER)
         resources:
           requests:
             cpu: 250m
