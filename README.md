@@ -54,7 +54,12 @@ so there is no `REPLACED-BY-KUSTOMIZE` placeholder to substitute. Render with
 the destination namespace.
 
 It assumes External Secrets Operator and the referenced `ClusterSecretStore`
-exist. It creates Secrets; it never mounts or injects them. Workloads keep
+exist. It creates Secrets; it never mounts or injects them.
+
+Both ExternalSecrets carry `argocd.argoproj.io/sync-options: Prune=false,Delete=false`:
+they are namespace-shared infrastructure, so previews can bootstrap them (first PR of a
+migrating app enables `secretsInjection`), later releases co-manage or adopt them, and
+neither disabling `secretsInjection` nor deleting a preview Application removes them. Workloads keep
 mapping keys explicitly exactly as before:
 
 ```yaml
