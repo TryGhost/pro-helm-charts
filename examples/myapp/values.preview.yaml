@@ -20,14 +20,14 @@ controllers:
       migrate:
         env: *previewDb
 
-# gitops-sync substitutes __PR_NUMBER__ when snapshotting the preview branch;
+# gitops-sync substitutes __GITHUB_PR_NUMBER__ when snapshotting the preview branch;
 # the staging cluster's wildcard *.ghostinfra.net cert covers the host and
 # external-dns publishes it against the shared internal gateway's LB.
 route:
   main:
     enabled: true
     hostnames:
-      - myapp-__PR_NUMBER__.ghostinfra.net
+      - myapp-__GITHUB_PR_NUMBER__.ghostinfra.net
 
 # Hot reload: replaces values.hot-reload.yaml. The chart adds the git-sync
 # init container + sidecar, the /workspace emptyDir, the pinned known_hosts

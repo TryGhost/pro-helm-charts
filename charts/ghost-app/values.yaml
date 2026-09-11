@@ -52,7 +52,7 @@ hotReload:
   repoAnnotation: ghost.org/git-repo
   # -- Git ref to follow. Empty = derived at runtime from the pod's
   # `<pullRequestLabel>` label as refs/pull/<number>/head (git-sync's
-  # GITSYNC_REF), so no __PR_NUMBER__ substitution is needed. Set explicitly
+  # GITSYNC_REF), so no __GITHUB_PR_NUMBER__ substitution is needed. Set explicitly
   # (e.g. a branch) to override.
   ref: ""
   # -- Pod label holding the pull request number (stamped by the pull-request

@@ -181,7 +181,7 @@ jobs:
           [ "$(yq '.env[] | select(.name=="APP_NAME") | .valueFrom.fieldRef.fieldPath' <<<"$main")" = "metadata.namespace" ]
           [ "$(yq '.spec.template.spec.initContainers[] | select(.name=="migrate") | .env[] | select(.name=="GITHUB_PR_NUMBER") | .valueFrom.fieldRef.fieldPath' <<<"$dep")" = "metadata.labels['pull-request']" ]
           [ "$(yq -N 'select(.kind=="ConfigMap") | .metadata.name' "$f" | sort | tr '\n' ' ')" = "myapp-config myapp-git-sync-hosts " ]
-          [ "$(yq 'select(.kind=="HTTPRoute") | .spec.hostnames[0]' "$f")" = "myapp-__PR_NUMBER__.ghostinfra.net" ]
+          [ "$(yq 'select(.kind=="HTTPRoute") | .spec.hostnames[0]' "$f")" = "myapp-__GITHUB_PR_NUMBER__.ghostinfra.net" ]
 
       - name: Check preview database rendering
         run: |
