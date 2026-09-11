@@ -42,12 +42,19 @@ previewDatabase:
 
 ### Automatic env injection
 
-Every container and initContainer gets `APP_NAME` (the pod's namespace —
-namespace == app by convention) and `GITHUB_PR_NUMBER` (the `pull-request`
-label the pull-request ApplicationSet stamps on preview pods; empty
-elsewhere) via the downward API, so values can reference `$(APP_NAME)` /
-`$(GITHUB_PR_NUMBER)` directly (e.g. a per-PR database name) without
-downward-API boilerplate. User-declared env with the same name wins.
+Every container and initContainer gets `APP_NAME` (the release namespace —
+namespace == app by convention) and `GITHUB_PR_NUMBER` (`preview.prNumber`,
+set by gitops-sync on preview renders; empty elsewhere) as literal env vars,
+so values can reference `$(APP_NAME)` / `$(GITHUB_PR_NUMBER)` directly
+(e.g. a per-PR database name). User-declared env with the same name wins.
+
+Preview facts arrive as values, not pod metadata: gitops-sync fills the
+`__GITHUB_PR_NUMBER__` / `__IMAGE_SHA__` tokens the app declares in its
+values when snapshotting, and `preview.prNumber` drives the injected env,
+the `pull-request` pod label, hotReload's git ref and previewDatabase's
+database name. The chart also defaults `defaultPodOptions.imagePullSecrets`
+to the DOKS registry integration's `ghost` secret (a non-empty user list
+wins) and deployment/statefulset strategy to RollingUpdate.
 
 ### Secret injection
 

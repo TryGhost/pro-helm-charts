@@ -26,31 +26,26 @@ as the app declared them.
 {{- default (printf "%s-git-sync-ssh" .Release.Namespace) .Values.hotReload.ssh.key -}}
 {{- end -}}
 
+{{- define "ghost-app.preview.gitRepo" -}}
+{{- $pv := .Values.preview -}}
+{{- coalesce .Values.hotReload.repo $pv.gitRepo (printf "git@github.com:%s/%s.git" $pv.owner .Release.Namespace) -}}
+{{- end -}}
+
 {{/*
-git-sync env (git-sync reads GITSYNC_* when the flag is not given):
-  - GITSYNC_REPO from the pod annotation stamped by the pull-request
-    ApplicationSet, unless hotReload.repo is set (then passed as --repo).
-  - GITSYNC_REF from the pod's pull-request label, unless hotReload.ref is set.
-    $(GITHUB_PR_NUMBER) is expanded by the kubelet (dependent env var expansion),
-    which only works for vars defined earlier; bjw-s emits env alphabetically,
-    so the helper var must sort before GITSYNC_REF.
+git-sync env (git-sync reads GITSYNC_* when the flag is not given). Repo and
+ref are literals at render time: gitops-sync passes preview.prNumber (the
+__GITHUB_PR_NUMBER__ token) when snapshotting, so no pod-metadata reads are
+needed.
 */}}
 {{- define "ghost-app.hotReload.gitSyncEnv" -}}
 {{- $hr := .Values.hotReload -}}
-{{- if not $hr.repo }}
-GITSYNC_REPO:
-  valueFrom:
-    fieldRef:
-      fieldPath: metadata.annotations['{{ $hr.repoAnnotation }}']
-{{- end }}
+GITSYNC_REPO: {{ include "ghost-app.preview.gitRepo" . | quote }}
 {{- if $hr.ref }}
 GITSYNC_REF: {{ $hr.ref | quote }}
+{{- else if .Values.preview.prNumber }}
+GITSYNC_REF: {{ printf "refs/pull/%s/head" (.Values.preview.prNumber | toString) | quote }}
 {{- else }}
-GITHUB_PR_NUMBER:
-  valueFrom:
-    fieldRef:
-      fieldPath: metadata.labels['{{ $hr.pullRequestLabel }}']
-GITSYNC_REF: refs/pull/$(GITHUB_PR_NUMBER)/head
+{{- fail "hotReload needs a git ref: set hotReload.ref or preview.prNumber" -}}
 {{- end }}
 {{- end -}}
 

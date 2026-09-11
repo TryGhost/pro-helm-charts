@@ -12417,7 +12417,7 @@
             "required": [
               "type"
             ],
-            "$comment": "oneOf enforces that at least one of name/identifier is present. dependentSchemas enforces mutual exclusion with a targeted error when both are set. Both are needed — do not simplify to oneOf alone.",
+            "$comment": "oneOf enforces that at least one of name/identifier is present. dependentSchemas enforces mutual exclusion with a targeted error when both are set. Both are needed \u2014 do not simplify to oneOf alone.",
             "oneOf": [
               {
                 "required": [
@@ -12490,7 +12490,7 @@
             "required": [
               "type"
             ],
-            "$comment": "oneOf enforces that at least one of name/identifier is present. dependentSchemas enforces mutual exclusion with a targeted error when both are set. Both are needed — do not simplify to oneOf alone.",
+            "$comment": "oneOf enforces that at least one of name/identifier is present. dependentSchemas enforces mutual exclusion with a targeted error when both are set. Both are needed \u2014 do not simplify to oneOf alone.",
             "oneOf": [
               {
                 "required": [
@@ -13001,7 +13001,7 @@
       "additionalProperties": false
     },
     "rawResources": {
-      "description": "Allows for the inclusion of raw Kubernetes resources that are not supported by the chart otherwise​",
+      "description": "Allows for the inclusion of raw Kubernetes resources that are not supported by the chart otherwise\u200b",
       "type": "object",
       "additionalProperties": {
         "type": "object",
@@ -13126,7 +13126,7 @@
         "refreshInterval": {
           "description": "ESO refresh interval for both ExternalSecrets.",
           "type": "string",
-          "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h)$",
+          "pattern": "^[0-9]+(ns|us|\u00b5s|ms|s|m|h)$",
           "default": "5m"
         },
         "store": {
@@ -13295,14 +13295,6 @@
               "pattern": "^/"
             }
           }
-        },
-        "pullRequestLabel": {
-          "type": "string",
-          "minLength": 1
-        },
-        "repoAnnotation": {
-          "type": "string",
-          "minLength": 1
         }
       }
     },
@@ -13359,10 +13351,6 @@
             }
           }
         },
-        "pullRequestLabel": {
-          "type": "string",
-          "minLength": 1
-        },
         "backoffLimit": {
           "type": "integer",
           "minimum": 0
@@ -13373,6 +13361,28 @@
         },
         "resources": {
           "type": "object"
+        }
+      }
+    },
+    "preview": {
+      "description": "Per-render preview facts, set by gitops-sync when snapshotting a PR preview. Empty outside previews.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "prNumber": {
+          "description": "Pull request number (render-time literal).",
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "gitRepo": {
+          "description": "SSH clone URL for hotReload; empty = derived from owner + release namespace.",
+          "type": "string"
+        },
+        "owner": {
+          "description": "GitHub owner used when deriving gitRepo.",
+          "type": "string"
         }
       }
     }

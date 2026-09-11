@@ -3,9 +3,9 @@ Automatic env injection.
 
 Every container and initContainer of every controller gets:
 
-  APP_NAME          the pod's namespace (namespace == app name by convention)
-  GITHUB_PR_NUMBER  the pod's pull-request label (stamped by the pull-request
-                    ApplicationSet on preview pods; empty elsewhere)
+  APP_NAME          the release namespace (namespace == app name by convention)
+  GITHUB_PR_NUMBER  preview.prNumber (set by gitops-sync on preview renders;
+                    empty elsewhere)
 
 so apps can reference $(APP_NAME) / $(GITHUB_PR_NUMBER) in their own env
 (kubelet dependent expansion — the bjw-s library emits env alphabetically and
@@ -18,8 +18,8 @@ injected entries prepended only when absent (mergeOverwrite replaces lists).
 */}}
 {{- define "ghost-app.envInjection.values" -}}
 {{- $injected := dict
-      "APP_NAME" (dict "valueFrom" (dict "fieldRef" (dict "fieldPath" "metadata.namespace")))
-      "GITHUB_PR_NUMBER" (dict "valueFrom" (dict "fieldRef" (dict "fieldPath" "metadata.labels['pull-request']"))) -}}
+      "APP_NAME" .Release.Namespace
+      "GITHUB_PR_NUMBER" (.Values.preview.prNumber | default "" | toString) -}}
 {{- $ctrls := dict -}}
 {{- range $cName, $c := (.Values.controllers | default dict) -}}
   {{- $cOut := dict -}}
@@ -33,14 +33,14 @@ injected entries prepended only when absent (mergeOverwrite replaces lists).
         {{- range $env -}}{{- $names = append $names (get . "name") -}}{{- end -}}
         {{- $new := list -}}
         {{- range $k, $v := $injected -}}
-          {{- if not (has $k $names) -}}{{- $new = append $new (merge (dict "name" $k) (deepCopy $v)) -}}{{- end -}}
+          {{- if not (has $k $names) -}}{{- $new = append $new (dict "name" $k "value" $v) -}}{{- end -}}
         {{- end -}}
         {{- if $new -}}{{- $_ := set $gOut $name (dict "env" (concat $new $env)) -}}{{- end -}}
       {{- else -}}
         {{- $envMap := $env | default dict -}}
         {{- $add := dict -}}
         {{- range $k, $v := $injected -}}
-          {{- if not (hasKey $envMap $k) -}}{{- $_ := set $add $k (deepCopy $v) -}}{{- end -}}
+          {{- if not (hasKey $envMap $k) -}}{{- $_ := set $add $k $v -}}{{- end -}}
         {{- end -}}
         {{- if $add -}}{{- $_ := set $gOut $name (dict "env" $add) -}}{{- end -}}
       {{- end -}}

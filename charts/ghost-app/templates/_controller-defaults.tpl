@@ -15,5 +15,23 @@ to RollingUpdate instead. User-declared strategy always wins.
     {{- $_ := set $ctrls $cName (dict "strategy" "RollingUpdate") -}}
   {{- end -}}
 {{- end -}}
-{{- dict "controllers" $ctrls | toYaml -}}
+{{- $out := dict "controllers" $ctrls -}}
+{{- $dpo := dict -}}
+{{- /* pull-request pod label from preview.prNumber, for `kubectl -l` selection
+       and log correlation (user labels are deep-merged, so this only adds) */ -}}
+{{- if .Values.preview.prNumber -}}
+  {{- $_ := set $dpo "labels" (dict "pull-request" (.Values.preview.prNumber | toString)) -}}
+{{- end -}}
+{{- /* DO's DOKS registry integration maintains the `ghost` pull secret in
+       every namespace but only attaches it to the default ServiceAccount;
+       the chart uses its own SA, so attach it here. A user-set (non-empty)
+       defaultPodOptions.imagePullSecrets wins — the common library defaults
+       the key to [], so emptiness means "unset". */ -}}
+{{- if empty (dig "imagePullSecrets" list (.Values.defaultPodOptions | default dict)) -}}
+  {{- $_ := set $dpo "imagePullSecrets" (list (dict "name" "ghost")) -}}
+{{- end -}}
+{{- if $dpo -}}
+  {{- $_ := set $out "defaultPodOptions" $dpo -}}
+{{- end -}}
+{{- $out | toYaml -}}
 {{- end -}}

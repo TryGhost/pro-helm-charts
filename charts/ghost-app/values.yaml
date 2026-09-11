@@ -17,6 +17,20 @@
 # already exist in the cluster. Creating these resources does not mount or
 # inject anything into containers: map keys explicitly with env/envFrom/
 # persistence as before.
+# -- Per-render preview facts, set by gitops-sync when it snapshots a PR
+# preview (values are literals at render time; nothing is read from pod
+# metadata). Empty outside previews.
+preview:
+  # -- Pull request number. Fills the injected GITHUB_PR_NUMBER env var, the
+  # pull-request pod label, hotReload's git ref and previewDatabase's
+  # database name.
+  prNumber: ""
+  # -- SSH clone URL for hotReload. Empty = derived as
+  # git@github.com:<owner>/<release namespace>.git (app name == namespace).
+  gitRepo: ""
+  # -- GitHub owner used when deriving gitRepo.
+  owner: TryGhost
+
 secretsInjection:
   # -- Master switch. Creates the `app-secrets` ExternalSecret -> Secret
   # (every GCP secret labeled namespace=<release namespace>, one key each).
@@ -44,20 +58,14 @@ hotReload:
   # -- Container in that controller whose command/args are replaced.
   container: main
   # -- Git repository to sync (SSH form), e.g. git@github.com:TryGhost/Daisy.js.git.
-  # Empty = read at runtime from the pod annotation `<repoAnnotation>`
   # (git-sync's GITSYNC_REPO), which the pull-request ApplicationSet stamps on
   # every preview via kustomize commonAnnotations. Set explicitly to override.
   repo: ""
   # -- Pod annotation holding the clone URL. Used only when `repo` is empty.
-  repoAnnotation: ghost.org/git-repo
   # -- Git ref to follow. Empty = derived at runtime from the pod's
-  # `<pullRequestLabel>` label as refs/pull/<number>/head (git-sync's
   # GITSYNC_REF), so no __GITHUB_PR_NUMBER__ substitution is needed. Set explicitly
   # (e.g. a branch) to override.
   ref: ""
-  # -- Pod label holding the pull request number (stamped by the pull-request
-  # ApplicationSet). Used only when `ref` is empty.
-  pullRequestLabel: pull-request
   # -- emptyDir mount path shared by git-sync and the app container.
   workspace: /workspace
   gitSync:
@@ -136,9 +144,6 @@ previewDatabase:
     port: port
     user: user
     password: password
-  # -- Pod label holding the pull request number (stamped by the pull-request
-  # ApplicationSet). Same convention as hotReload.pullRequestLabel.
-  pullRequestLabel: pull-request
   # -- Job retries before giving up.
   backoffLimit: 2
   # -- Seconds a finished Job is kept before garbage collection.
