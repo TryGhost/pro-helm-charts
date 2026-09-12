@@ -132,7 +132,7 @@ previewDatabase:
   enabled: false
   image:
     repository: mysql
-    tag: "8.4"
+    tag: "26.7@sha256:45abdd9b4144660b5c93a5b7d0ebb21e024f0ba9851ecb4ab43bf83c6bf83592"
   # -- Secret holding the MySQL connection details (pairs with
   # secretsInjection.database, which creates app-db-secrets).
   secretName: app-db-secrets
