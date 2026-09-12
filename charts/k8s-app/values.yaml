@@ -11,12 +11,6 @@
 # options k8s-app adds. Upstream keeps its values.yaml empty for the same
 # reason: the library defaults are merged in at render time.
 
-# -- External Secrets injection. Replaces the k8s repo's
-# components/app-secrets and components/app-db-secrets Kustomize components.
-# Assumes External Secrets Operator and the referenced ClusterSecretStore
-# already exist in the cluster. Creating these resources does not mount or
-# inject anything into containers: map keys explicitly with env/envFrom/
-# persistence as before.
 # -- Per-render preview facts, set by gitops-sync when it snapshots a PR
 # preview (values are literals at render time; nothing is read from pod
 # metadata). Empty outside previews.
@@ -31,6 +25,11 @@ preview:
   # -- GitHub owner used when deriving gitRepo.
   owner: TryGhost
 
+# -- External Secrets injection: the app-secrets / app-db-secrets
+# ExternalSecrets for the release namespace. Assumes External Secrets
+# Operator and the referenced ClusterSecretStore already exist in the
+# cluster. Creating these resources does not mount or inject anything into
+# containers: map keys explicitly with env/envFrom/persistence as before.
 secretsInjection:
   # -- Master switch. Creates the `app-secrets` ExternalSecret -> Secret
   # (every GCP secret labeled namespace=<release namespace>, one key each).
@@ -50,21 +49,20 @@ secretsInjection:
 # -- Hot reload for PR previews. Adds a git-sync init container and sidecar
 # to one controller, a shared emptyDir workspace, and swaps the app
 # container's command for a file-watching dev runner. The image supplies
-# dependencies; git-sync supplies the PR's latest code. See README.
+# dependencies; git-sync supplies the PR's latest code. See the repo README.
 hotReload:
   enabled: false
   # -- Controller (under `controllers`) to add git-sync to.
   controller: main
   # -- Container in that controller whose command/args are replaced.
   container: main
-  # -- Git repository to sync (SSH form), e.g. git@github.com:TryGhost/Daisy.js.git.
-  # (git-sync's GITSYNC_REPO), which the pull-request ApplicationSet stamps on
-  # every preview via kustomize commonAnnotations. Set explicitly to override.
+  # -- Git repository to sync (SSH form, git-sync's GITSYNC_REPO), e.g.
+  # git@github.com:TryGhost/Daisy.js.git. Empty = preview.gitRepo, itself
+  # defaulting to git@github.com:<preview.owner>/<release namespace>.git.
   repo: ""
-  # -- Pod annotation holding the clone URL. Used only when `repo` is empty.
-  # -- Git ref to follow. Empty = derived at runtime from the pod's
-  # GITSYNC_REF), so no __GITHUB_PR_NUMBER__ substitution is needed. Set explicitly
-  # (e.g. a branch) to override.
+  # -- Git ref to follow (git-sync's GITSYNC_REF). Empty = derived at render
+  # time as refs/pull/<preview.prNumber>/head. Set explicitly (e.g. a branch)
+  # to override.
   ref: ""
   # -- emptyDir mount path shared by git-sync and the app container.
   workspace: /workspace

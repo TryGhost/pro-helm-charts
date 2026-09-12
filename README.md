@@ -31,8 +31,8 @@ secretsInjection:
 
 hotReload:
   enabled: false        # git-sync init container + sidecar, dev runner in the app container
-  repo: ""              # default: read from the pod's ghost.org/git-repo annotation (set by the ApplicationSet)
-  ref: ""               # default: refs/pull/<n>/head, <n> read from the pod's pull-request label
+  repo: ""              # default: git@github.com:<preview.owner>/<namespace>.git (render-time literal)
+  ref: ""               # default: refs/pull/<preview.prNumber>/head (render-time literal)
   # see charts/k8s-app/values.yaml for everything else
 
 previewDatabase:
@@ -105,14 +105,13 @@ per-app `values.hot-reload.yaml`. When enabled it deep-merges the following into
 touches nothing else (env, envFrom and your own volumes are preserved):
 
 - `controllers.<controller>.initContainers.git-sync-init`: one-time clone.
-  Repository and ref are read from the pod at runtime through git-sync's
-  `GITSYNC_REPO` / `GITSYNC_REF` env: the clone URL from the
-  `ghost.org/git-repo` annotation and the PR number from the `pull-request`
-  label, both stamped on every preview pod by the pull-request ApplicationSet
-  (`kustomize.commonAnnotations` / `commonLabels`). Nothing per-app or per-PR
-  needs to be written into values. Set `hotReload.repo` / `hotReload.ref` to
-  override (a repository is not derivable from the release name: `daisy-js`
-  vs `Daisy.js`).
+  Repository and ref are literals baked in at render time through git-sync's
+  `GITSYNC_REPO` / `GITSYNC_REF` env: the clone URL derived as
+  `git@github.com:<preview.owner>/<release namespace>.git` and the ref as
+  `refs/pull/<preview.prNumber>/head` (gitops-sync fills `preview.prNumber`
+  when snapshotting). Nothing per-PR needs to be written into values. Set
+  `hotReload.repo` / `hotReload.ref` to override (e.g. when the repository
+  name isn't the namespace: `daisy-js` vs `Daisy.js`).
 - `controllers.<controller>.containers.git-sync`: sidecar polling every `2s`
   (`gitSync.period`), publishing `/workspace/git/app` with git-sync's atomic
   symlink contract and keeping stale worktrees for `5m`.
@@ -127,7 +126,7 @@ touches nothing else (env, envFrom and your own volumes are preserved):
 - `configMaps.git-sync-hosts` with GitHub's published Ed25519 host key,
   mounted at `/etc/git-hosts/known_hosts` (host-key verification on).
 - `persistence.workspace` (emptyDir), `persistence.git-sync-ssh` (only the
-  `<release>-git-sync-ssh` key of `app-secrets`, mode `0440`, mounted only into
+  `<namespace>-git-sync-ssh` key of `app-secrets`, mode `0440`, mounted only into
   the two git-sync containers) and `persistence.git-sync-hosts`.
 - `defaultPodOptions.securityContext.fsGroup: 65533` so git-sync can read the key.
 
@@ -144,9 +143,9 @@ and reaches `app-secrets` through `secretsInjection`, so hot reload needs
 `<release>-create-preview-db` and `<release>-drop-preview-db`, both running
 `mysql:8.4` with `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASS` from the
 `app-db-secrets` Secret (so it pairs with `secretsInjection.database: true`),
-`APP_NAME` from the pod's namespace and `PR_NUMBER` from its `pull-request`
-label. The database is `<namespace>_preview_<pr>`; a shell guard refuses a
-non-numeric PR number.
+plus `APP_NAME` (the release namespace) and `GITHUB_PR_NUMBER`
+(`preview.prNumber`) as render-time literals. The database is
+`<namespace>_preview_<pr>`; a shell guard refuses a non-numeric PR number.
 
 - **create**: sync-wave 0 with `Force=true,Replace=true`, deliberately not a
   PreSync hook. It needs the `app-db-secrets` Secret, which the wave -1
@@ -157,33 +156,40 @@ non-numeric PR number.
 - **drop**: `PostDelete` hook with `HookSucceeded` delete policy, runs
   `DROP DATABASE IF EXISTS` when ArgoCD deletes the preview Application.
 
-The chart does not stamp the per-PR `nameSuffix` or the `pull-request` label;
-both come from the pull-request ApplicationSet's kustomize transforms.
+The chart stamps the `pull-request` pod label from `preview.prNumber`; the
+per-PR release name (`<app>-<pr>`) comes from the pull-request
+ApplicationSet's `releaseName`.
 Pointing the app at the database (`db__connection__database`) stays in the
 app's preview values. Example:
 [`examples/myapp/values.preview.yaml`](examples/myapp/values.preview.yaml).
 
 ### Using the chart
 
+Apps consume it as the single dependency of an umbrella chart in their
+`.k8s/` (Renovate bumps the pin via PRs):
+
 ```yaml
-# kustomize helmCharts entry (ArgoCD with --enable-helm)
-helmCharts:
+# .k8s/Chart.yaml
+apiVersion: v2
+name: myapp
+version: 0.0.0
+dependencies:
   - name: k8s-app
-    repo: https://tryghost.github.io/pro-helm-charts
-    version: 0.2.0
-    releaseName: myapp
-    namespace: myapp
-    valuesFile: ../../base/values.yaml
-    additionalValuesFiles:
-      - values.staging.yaml
+    repository: https://tryghost.github.io/pro-helm-charts
+    version: <release>
 ```
 
-or plain Helm:
+with flat `values.{base,<env>,preview}.yaml` next to it. gitops-sync wraps
+those values under the `k8s-app:` key when snapshotting (helm scopes subchart
+values under the dependency name) and ArgoCD renders the snapshot with plain
+helm (`releaseName` + `valueFiles` from the ApplicationSet).
+
+Or plain Helm:
 
 ```sh
 helm repo add ghost https://tryghost.github.io/pro-helm-charts
-helm install myapp ghost/k8s-app --version 0.2.0 -n myapp -f values.yaml
-helm show values ghost/k8s-app --version 0.2.0
+helm install myapp ghost/k8s-app --version <release> -n myapp -f values.yaml
+helm show values ghost/k8s-app --version <release>
 ```
 
 Every published release bundles the `common` version from its `Chart.lock`, so
@@ -292,8 +298,9 @@ creating the release, which immutable releases reject (that is how the empty
 6. Install [Renovate](https://github.com/apps/renovate) on the repository (the
    config is `renovate.json`).
 
-ArgoCD needs no access to this repository: `kustomize build --enable-helm`
-on the repo-server runs a plain anonymous `helm pull` against the Pages URL.
+ArgoCD needs no access to this repository: the repo-server's
+`helm dependency build` on a snapshot runs a plain anonymous `helm pull`
+against the Pages URL (pinned by the snapshot's `Chart.lock`).
 
 ## Updating common (Renovate)
 
@@ -336,25 +343,28 @@ are updated by Renovate the same way (review-required, patch bump reminder).
 
 ## Versioning and adoption
 
-Apps pin a k8s-app version in their `helmCharts` entry and upgrade
-independently; each release bundles its own common, so upgrading one app never
-forces another. To roll back, set `version:` back to the previous release
-(all versions remain in `index.yaml`) and let ArgoCD sync.
+Apps pin a k8s-app version in their umbrella `Chart.yaml` dependency and
+upgrade independently; each release bundles its own common, so upgrading one
+app never forces another. To roll back, set `version:` back to the previous
+release (all versions remain in `index.yaml`) and let the next gitops-sync
+snapshot roll it out.
 
 ## Migrating an app from app-template
 
 [`examples/myapp`](examples/myapp) shows the target layout for an app deployed
-through the k8s gitops repo (`base/values.yaml` plus one values file per
-environment). A migrated app renders the same resource set as before with
+through the k8s gitops repo: a flat `.k8s/` with the umbrella `Chart.yaml`
+above plus `values.base.yaml` and one values file per environment (no
+kustomize). A migrated app renders the same resource set as before with
 identical specs; only the `helm.sh/chart` labels and standard labels on the
 ExternalSecrets differ.
 
 In the app's `.k8s`:
 
-1. `base/kustomization.yaml`: remove the `components:` block referencing
-   `components/app-secrets` and `components/app-db-secrets`. Keep
-   `namespace: <app>`.
-2. `base/values.yaml`: add
+1. Replace `base/`, `overlays/` and every `kustomization.yaml` with the flat
+   layout: `Chart.yaml` + `values.base.yaml` + `values.<env>.yaml` +
+   `values.preview.yaml`, using `__IMAGE_SHA__` for the image tag and
+   `__GITHUB_PR_NUMBER__` for preview-only facts (gitops-sync fills both).
+2. `values.base.yaml`: add
 
    ```yaml
    secretsInjection:
@@ -362,23 +372,7 @@ In the app's `.k8s`:
      database: true   # only for apps with a Terraform-managed database
    ```
 
-3. Every overlay's `helmCharts` entry: `name: k8s-app`,
-   `repo: https://tryghost.github.io/pro-helm-charts`, `version: <release>`.
-4. If the app has a preview overlay with a `values.hot-reload.yaml`: delete it
-   and its `additionalValuesFiles` entry, and add to `values.preview.yaml`:
-
-   ```yaml
-   hotReload:
-     enabled: true
-   ```
-
-5. If the preview overlay references `components/db-previews`: remove it and
-   add `previewDatabase: {enabled: true}` to `values.preview.yaml`.
-   `gateway-api-name-refs` is supplied by the pull-request ApplicationSet and
-   is removed from the overlay too.
-
-In the k8s repo, once no app references them, delete
-`components/app-secrets` and `components/app-db-secrets`, and drop the
-`REPLACED-BY-KUSTOMIZE` render check from `gitops-sync.yml` (or leave it: it
-simply never matches). Update the README's secret convention sections to
-point at `secretsInjection`.
+3. `values.preview.yaml`: set `preview.prNumber: __GITHUB_PR_NUMBER__`, and
+   enable the preview features (`hotReload: {enabled: true}`,
+   `previewDatabase: {enabled: true}`) instead of the old
+   `values.hot-reload.yaml` / `components/db-previews`.
