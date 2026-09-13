@@ -1,3 +1,8 @@
+configMaps:
+  config:
+    data:
+      NODE_ENV: production
+
 controllers:
   main:
     containers:

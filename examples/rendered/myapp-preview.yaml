@@ -22,7 +22,7 @@ metadata:
     app.kubernetes.io/name: myapp
   namespace: myapp
 data:
-  NODE_ENV: production
+  NODE_ENV: staging
   db__client: mysql2
   db__connection__charset: utf8mb4
   db__connection__database: myapp
@@ -87,7 +87,7 @@ spec:
   template:
     metadata:
       annotations: 
-        checksum/configMaps: 155ce7636071db03db28c864af31b063af56059f11b467eb13172379ee09f58e
+        checksum/configMaps: 6fc22be2a5093455f04b3c38dbafc95d901c325a7b7578942363dffb1185998b
       labels: 
         app.kubernetes.io/controller: main
         app.kubernetes.io/instance: myapp
@@ -187,7 +187,7 @@ spec:
           envFrom:
           - configMapRef:
               name: myapp-config
-          image: registry.digitalocean.com/ghost/myapp:latest
+          image: registry.digitalocean.com/ghost/myapp:__IMAGE_SHA__
           name: migrate
       containers: 
         - args:
@@ -280,7 +280,7 @@ spec:
           envFrom:
           - configMapRef:
               name: myapp-config
-          image: registry.digitalocean.com/ghost/myapp:latest
+          image: registry.digitalocean.com/ghost/myapp:__IMAGE_SHA__
           livenessProbe:
             httpGet:
               path: /readyz
@@ -291,7 +291,7 @@ spec:
             httpGet:
               path: /readyz
               port: 3000
-            periodSeconds: 5
+            periodSeconds: 15
           resources:
             limits:
               cpu: 1
@@ -299,6 +299,13 @@ spec:
             requests:
               cpu: 250m
               memory: 256Mi
+          startupProbe:
+            failureThreshold: 30
+            httpGet:
+              path: /readyz
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 2
           volumeMounts:
           - mountPath: /workspace
             name: workspace

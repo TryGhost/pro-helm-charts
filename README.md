@@ -212,7 +212,7 @@ helm dependency build charts/k8s-app          # fetches charts/common-<ver>.tgz 
 helm lint --strict charts/k8s-app -f examples/minimal.yaml
 helm template app charts/k8s-app -n app -f examples/app-db-secrets.yaml
 helm template myapp charts/k8s-app -n myapp \
-  -f examples/myapp/values.yaml -f examples/myapp/values.preview.yaml
+  -f examples/myapp/values.base.yaml -f examples/myapp/values.preview.yaml
 ./scripts/regen.sh                            # after any chart change: schema + rendered snapshots
 ```
 

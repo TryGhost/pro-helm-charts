@@ -1,0 +1,10 @@
+# The app's chart pin, read by gitops-sync when it generates the per-env
+# kustomizations in TryGhost/k8s (this directory ships values only). A real
+# helm Chart.yaml so Renovate's helmv3 manager bumps the dependency via PRs.
+apiVersion: v2
+name: myapp
+version: 0.0.0
+dependencies:
+  - name: k8s-app
+    repository: https://tryghost.github.io/pro-helm-charts
+    version: 0.7.0

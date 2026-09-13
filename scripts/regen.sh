@@ -31,6 +31,6 @@ render minimal        app   app   -f examples/minimal.yaml
 render app-secrets    app   app   -f examples/app-secrets.yaml
 render app-db-secrets app   app   -f examples/app-db-secrets.yaml
 for env in staging production preview; do
-  render "myapp-$env" myapp myapp -f examples/myapp/values.yaml -f "examples/myapp/values.$env.yaml"
+  render "myapp-$env" myapp myapp -f examples/myapp/values.base.yaml -f "examples/myapp/values.$env.yaml"
 done
 echo "regenerated: $CHART/values.schema.json examples/rendered/"

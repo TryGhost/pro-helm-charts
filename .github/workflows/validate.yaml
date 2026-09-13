@@ -46,7 +46,7 @@ jobs:
             helm lint --strict "$CHART" -f "$f"
           done
           for env in staging production preview; do
-            helm lint --strict "$CHART" -f examples/myapp/values.yaml -f "examples/myapp/values.$env.yaml"
+            helm lint --strict "$CHART" -f examples/myapp/values.base.yaml -f "examples/myapp/values.$env.yaml"
           done
 
       - name: Schema rejects invalid values
@@ -89,13 +89,13 @@ jobs:
           echo "the SSH deploy key is mounted only into git-sync containers"
           [ "$(yq 'select(.kind=="Deployment") | .spec.template.spec.containers[] | select(.name=="main") | .volumeMounts[] | select(.name=="git-sync-ssh") | .name' "$r/myapp-preview.yaml")" = "" ]
           echo "explicit hotReload.repo / .ref override the derived values"
-          ov=$(helm template myapp "$CHART" -n myapp -f examples/myapp/values.yaml -f examples/myapp/values.preview.yaml \
+          ov=$(helm template myapp "$CHART" -n myapp -f examples/myapp/values.base.yaml -f examples/myapp/values.preview.yaml \
                  --set hotReload.repo=git@github.com:TryGhost/Daisy.js.git --set hotReload.ref=refs/heads/main \
                | yq 'select(.kind=="Deployment") | .spec.template.spec.containers[] | select(.name=="git-sync")')
           yq '.args[]' <<<"$ov" | grep -cx -- '--repo=git@github.com:TryGhost/Daisy.js.git'
           [ "$(yq '.env[] | select(.name=="GITSYNC_REF") | .value' <<<"$ov")" = "refs/heads/main" ]
           echo "previewDatabase reads a custom Secret / key when told to"
-          c=$(helm template myapp "$CHART" -n myapp -f examples/myapp/values.yaml -f examples/myapp/values.preview.yaml \
+          c=$(helm template myapp "$CHART" -n myapp -f examples/myapp/values.base.yaml -f examples/myapp/values.preview.yaml \
                 --set previewDatabase.secretName=other-db --set previewDatabase.keys.password=pw \
               | yq 'select(.kind=="Job" and .metadata.name=="myapp-create-preview-db") | .spec.template.spec.containers[0].env')
           [ "$(yq '.[] | select(.name=="DB_USER") | .valueFrom.secretKeyRef.name' <<<"$c")" = "other-db" ]

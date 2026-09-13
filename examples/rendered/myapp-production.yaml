@@ -126,7 +126,7 @@ spec:
           envFrom:
           - configMapRef:
               name: myapp
-          image: registry.digitalocean.com/ghost/myapp:latest
+          image: registry.digitalocean.com/ghost/myapp:__IMAGE_SHA__
           name: migrate
       containers: 
         - command:
@@ -165,7 +165,7 @@ spec:
           envFrom:
           - configMapRef:
               name: myapp
-          image: registry.digitalocean.com/ghost/myapp:latest
+          image: registry.digitalocean.com/ghost/myapp:__IMAGE_SHA__
           livenessProbe:
             httpGet:
               path: /readyz
@@ -176,7 +176,7 @@ spec:
             httpGet:
               path: /readyz
               port: 3000
-            periodSeconds: 5
+            periodSeconds: 15
           resources:
             limits:
               cpu: 4
@@ -184,6 +184,13 @@ spec:
             requests:
               cpu: 1
               memory: 512Mi
+          startupProbe:
+            failureThreshold: 30
+            httpGet:
+              path: /readyz
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 2
 ---
 # Source: k8s-app/templates/app-db-secrets.yaml
 apiVersion: external-secrets.io/v1

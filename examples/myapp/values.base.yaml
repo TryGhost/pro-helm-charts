@@ -1,19 +1,24 @@
-# Full application example: base values (one per app, shared by all environments).
-# Plain bjw-s values plus secretsInjection, which replaces
-# the two Kustomize component references (components/app-secrets and
-# components/app-db-secrets) an app-template deployment referenced from Kustomize.
+# https://github.com/TryGhost/pro-helm-charts
+
 secretsInjection:
   enabled: true
   database: true
+
+configMaps:
+  config:
+    data:
+      db__client: mysql2
+      db__connection__charset: utf8mb4
+      db__connection__database: myapp
 
 controllers:
   main:
     containers:
       main:
-        # Bumped by .github/workflows/build.yml on each push to main.
+        # __IMAGE_SHA__ is filled by gitops-sync when snapshotting to k8s gitops repo
         image: &image
           repository: registry.digitalocean.com/ghost/myapp
-          tag: latest
+          tag: __IMAGE_SHA__
         command:
           - node
           - src/main.js
@@ -21,12 +26,6 @@ controllers:
           - configMapRef:
               identifier: config
         env: &env
-          # Explicit mappings: the app-db-secrets Secret (app-db-secrets, exploded
-          # from Terraform's <env>-<app>db GCP secret) uses plain field
-          # names, not the nconf env var names, so envFrom on the Secret can't
-          # be used. The database name is not in the GCP secret (the cluster
-          # only knows DO's defaultdb) — it comes from the config ConfigMap;
-          # env entries here take precedence over envFrom.
           db__connection__host:
             valueFrom:
               secretKeyRef:
@@ -47,13 +46,22 @@ controllers:
               secretKeyRef:
                 name: app-db-secrets
                 key: password
-          # DO managed MySQL requires TLS; mysql2 takes `ssl: { ca }`.
           db__connection__ssl__ca:
             valueFrom:
               secretKeyRef:
                 name: app-db-secrets
                 key: ssl_ca
         probes:
+          startup:
+            enabled: true
+            custom: true
+            spec:
+              httpGet:
+                path: /readyz
+                port: 3000
+              initialDelaySeconds: 5
+              periodSeconds: 2
+              failureThreshold: 30
           liveness:
             enabled: true
             custom: true
@@ -69,26 +77,15 @@ controllers:
               httpGet:
                 path: /readyz
                 port: 3000
-              periodSeconds: 5
+              periodSeconds: 15
     initContainers:
-      # Run pending knex migrations before the app starts, same as the
-      # docker-compose dev flow (pnpm migrate:latest && pnpm start).
       migrate:
         image: *image
-        # pnpm .bin entries are shell shims, not JS — exec directly, not via node
         command:
           - ./node_modules/.bin/knex
           - migrate:latest
         envFrom: *envFrom
         env: *env
-
-configMaps:
-  config:
-    data:
-      NODE_ENV: production
-      db__client: mysql2
-      db__connection__charset: utf8mb4
-      db__connection__database: myapp
 
 service:
   main:
@@ -97,11 +94,6 @@ service:
       http:
         port: 3000
 
-# Internal endpoint: attaches to the cluster's shared internal Gateway (a
-# VPC-only DO load balancer, created by terraform's do-k8s module). Disabled
-# here so previews don't attach a hostname-less catch-all route — each
-# environment enables it with its own hostname. external-dns publishes the
-# hostname; the gateway's wildcard cert covers it.
 route:
   main:
     enabled: false

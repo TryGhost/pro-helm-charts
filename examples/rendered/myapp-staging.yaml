@@ -22,7 +22,7 @@ metadata:
     app.kubernetes.io/name: myapp
   namespace: myapp
 data:
-  NODE_ENV: production
+  NODE_ENV: staging
   db__client: mysql2
   db__connection__charset: utf8mb4
   db__connection__database: myapp
@@ -74,7 +74,7 @@ spec:
   template:
     metadata:
       annotations: 
-        checksum/configMaps: 39545143d7662e92571701c1b04ee59006e58aca76c93818e6b84b6e24b2b5a6
+        checksum/configMaps: 45f2c8441886c566d4ceec332dcaf9b789160ecf5a09251ff016f68cdc2b5316
       labels: 
         app.kubernetes.io/controller: main
         app.kubernetes.io/instance: myapp
@@ -126,7 +126,7 @@ spec:
           envFrom:
           - configMapRef:
               name: myapp
-          image: registry.digitalocean.com/ghost/myapp:latest
+          image: registry.digitalocean.com/ghost/myapp:__IMAGE_SHA__
           name: migrate
       containers: 
         - command:
@@ -165,7 +165,7 @@ spec:
           envFrom:
           - configMapRef:
               name: myapp
-          image: registry.digitalocean.com/ghost/myapp:latest
+          image: registry.digitalocean.com/ghost/myapp:__IMAGE_SHA__
           livenessProbe:
             httpGet:
               path: /readyz
@@ -176,7 +176,7 @@ spec:
             httpGet:
               path: /readyz
               port: 3000
-            periodSeconds: 5
+            periodSeconds: 15
           resources:
             limits:
               cpu: 1
@@ -184,6 +184,13 @@ spec:
             requests:
               cpu: 500m
               memory: 256Mi
+          startupProbe:
+            failureThreshold: 30
+            httpGet:
+              path: /readyz
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 2
 ---
 # Source: k8s-app/templates/app-db-secrets.yaml
 apiVersion: external-secrets.io/v1
