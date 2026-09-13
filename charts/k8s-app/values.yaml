@@ -99,20 +99,10 @@ hotReload:
     # module: per-PR preview releases are named <app>-<pr>, but the deploy
     # key is provisioned per app, not per release.
     key: ""
-  # -- Hydrates known_hosts at pod boot: an init container fetches GitHub's
+  # -- Hydrates known_hosts at pod boot: git-sync-init fetches GitHub's
   # published host keys from the meta API (TLS-anchored) into an emptyDir
-  # shared with the git-sync containers — nothing pinned, nothing to rotate.
-  knownHostsInit:
-    image:
-      repository: curlimages/curl
-      tag: 8.15.0
-    url: https://api.github.com/meta
-    resources:
-      requests:
-        cpu: 10m
-        memory: 16Mi
-      limits:
-        memory: 32Mi
+  # shared with the sidecar — nothing pinned, nothing to rotate.
+  knownHostsUrl: https://api.github.com/meta
   app:
     # -- Entrypoint for the app container while hot reloading. The default
     # runs the generated args script under tini.

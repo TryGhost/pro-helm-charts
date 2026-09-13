@@ -123,9 +123,10 @@ touches nothing else (env, envFrom and your own volumes are preserved):
   dependencies under `/app/node_modules`; change
   `hotReload.app.{devCommand,run,nodeModules}` for others, or set
   `hotReload.app.args` to take over the script entirely.
-- `controllers.<controller>.initContainers.git-hosts-init`: hydrates
+- `controllers.<controller>.initContainers.git-sync-init`: hydrates
   `/etc/git-hosts/known_hosts` at boot from GitHub's meta API (TLS-anchored,
-  host-key verification on, nothing pinned to rotate).
+  host-key verification on, nothing pinned to rotate), then does the one-time
+  clone.
 - `persistence.workspace` (emptyDir), `persistence.git-sync-ssh` (only the
   `<namespace>-git-sync-ssh` key of `app-secrets`, mode `0440`, mounted only into
   the two git-sync containers) and `persistence.git-sync-hosts` (emptyDir).

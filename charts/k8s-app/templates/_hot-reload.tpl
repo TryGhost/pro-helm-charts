@@ -4,12 +4,10 @@ Hot reload for PR previews.
 Returns a bjw-s values fragment that is deep-merged over the user's values by
 templates/common.yaml when hotReload.enabled is true:
 
-  - controllers.<controller>.initContainers.git-hosts-init known_hosts hydrated
+  - controllers.<controller>.initContainers.git-sync-init  known_hosts hydrated
                                                            from the GitHub meta
-                                                           API (runs first: init
-                                                           containers run in name
-                                                           order)
-  - controllers.<controller>.initContainers.git-sync-init  one-time clone
+                                                           API, then one-time
+                                                           clone
   - controllers.<controller>.containers.git-sync           polling sidecar
   - controllers.<controller>.containers.<container>        command/args swapped
                                                            for the dev runner
@@ -105,23 +103,6 @@ defaultPodOptions:
 controllers:
   {{ $controller }}:
     initContainers:
-      # Trust is anchored in TLS to the meta API, so host keys follow GitHub
-      # with no pinned copy to rotate.
-      git-hosts-init:
-        image:
-          repository: {{ $hr.knownHostsInit.image.repository }}
-          tag: {{ $hr.knownHostsInit.image.tag }}
-        command: [/bin/sh, -ec]
-        args:
-          - |
-            curl -fsSL --retry 5 {{ $hr.knownHostsInit.url }} \
-              | tr ',' '\n' \
-              | grep -oE '"(ssh-ed25519|ecdsa-sha2-[a-z0-9-]+|ssh-rsa) [A-Za-z0-9+/=]+"' \
-              | tr -d '"' \
-              | sed 's/^/github.com /' > /etc/git-hosts/known_hosts
-            grep -c '^github.com ' /etc/git-hosts/known_hosts
-        securityContext: {{ $gitSyncSecurityContext | toJson }}
-        resources: {{ $hr.knownHostsInit.resources | toJson }}
       git-sync-init:
         image:
           repository: {{ $hr.gitSync.image.repository }}
@@ -130,6 +111,22 @@ controllers:
         resources: {{ $hr.gitSync.resources | toJson }}
         env:
           {{- include "k8s-app.hotReload.gitSyncEnv" . | nindent 10 }}
+        # Hydrate known_hosts from the GitHub meta API (the git-sync image
+        # ships curl/grep/sed), then exec git-sync with the args below as "$@".
+        # Trust is anchored in TLS to the meta API, so host keys follow GitHub
+        # with no pinned copy to rotate; the sidecar reads the same file.
+        command:
+          - /bin/sh
+          - -ec
+          - |
+            curl -fsSL --retry 5 {{ $hr.knownHostsUrl }} \
+              | tr ',' '\n' \
+              | grep -oE '"(ssh-ed25519|ecdsa-sha2-[a-z0-9-]+|ssh-rsa) [A-Za-z0-9+/=]+"' \
+              | tr -d '"' \
+              | sed 's/^/github.com /' > /etc/git-hosts/known_hosts
+            grep -c '^github.com ' /etc/git-hosts/known_hosts
+            exec /git-sync "$@"
+          - git-sync
         args:
           {{- include "k8s-app.hotReload.gitSyncArgs" . | nindent 10 }}
           - --one-time
@@ -182,8 +179,7 @@ persistence:
     type: emptyDir
     advancedMounts:
       {{ $controller }}:
-        git-hosts-init:
+        git-sync-init:
           - path: /etc/git-hosts
-        git-sync-init: {{ $hostsMounts | toJson }}
         git-sync: {{ $hostsMounts | toJson }}
 {{- end -}}
