@@ -36,8 +36,8 @@ route:
       - myapp-__GITHUB_PR_NUMBER__.ghostinfra.net
 
 # Hot reload: replaces values.hot-reload.yaml. The chart adds the git-sync
-# init container + sidecar, the /workspace emptyDir, the pinned known_hosts
-# ConfigMap and the SSH-key-only Secret projection, and runs `pnpm dev`
+# init container + sidecar, the /workspace emptyDir, boot-time known_hosts
+# hydration and the SSH-key-only Secret projection, and runs `pnpm dev`
 # (nodemon, --legacy-watch) against the synced checkout.
 # Repository and ref are render-time literals derived from preview.prNumber
 # and the release namespace (git@github.com:<owner>/<namespace>.git).

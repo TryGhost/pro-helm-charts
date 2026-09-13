@@ -99,11 +99,20 @@ hotReload:
     # module: per-PR preview releases are named <app>-<pr>, but the deploy
     # key is provisioned per app, not per release.
     key: ""
-    # -- Pinned SSH host key(s) for the git host (GitHub's published Ed25519
-    # key), not a runtime keyscan.
-    # https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints
-    knownHosts: |
-      github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+  # -- Hydrates known_hosts at pod boot: an init container fetches GitHub's
+  # published host keys from the meta API (TLS-anchored) into an emptyDir
+  # shared with the git-sync containers — nothing pinned, nothing to rotate.
+  knownHostsInit:
+    image:
+      repository: curlimages/curl
+      tag: 8.15.0
+    url: https://api.github.com/meta
+    resources:
+      requests:
+        cpu: 10m
+        memory: 16Mi
+      limits:
+        memory: 32Mi
   app:
     # -- Entrypoint for the app container while hot reloading. The default
     # runs the generated args script under tini.

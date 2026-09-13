@@ -123,11 +123,12 @@ touches nothing else (env, envFrom and your own volumes are preserved):
   dependencies under `/app/node_modules`; change
   `hotReload.app.{devCommand,run,nodeModules}` for others, or set
   `hotReload.app.args` to take over the script entirely.
-- `configMaps.git-sync-hosts` with GitHub's published Ed25519 host key,
-  mounted at `/etc/git-hosts/known_hosts` (host-key verification on).
+- `controllers.<controller>.initContainers.git-hosts-init`: hydrates
+  `/etc/git-hosts/known_hosts` at boot from GitHub's meta API (TLS-anchored,
+  host-key verification on, nothing pinned to rotate).
 - `persistence.workspace` (emptyDir), `persistence.git-sync-ssh` (only the
   `<namespace>-git-sync-ssh` key of `app-secrets`, mode `0440`, mounted only into
-  the two git-sync containers) and `persistence.git-sync-hosts`.
+  the two git-sync containers) and `persistence.git-sync-hosts` (emptyDir).
 - `defaultPodOptions.securityContext.fsGroup: 65533` so git-sync can read the key.
 
 The deploy key is written to Secret Manager by the Terraform `argocd` module
