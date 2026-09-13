@@ -1,0 +1,68 @@
+{{- /*
+Replaces the k8s repo's components/db-previews Kustomize component: two Jobs
+that differ only in name, ArgoCD annotations and the SQL statement.
+
+create: NOT a PreSync hook, deliberately. The job reads credentials from the
+app-db-secrets Secret, which the app-db-secrets ExternalSecret (sync-wave -1)
+only materializes during the main sync — a PreSync hook would deadlock on a
+fresh namespace waiting for a Secret the sync hasn't applied yet. It runs in
+wave 0 with the workloads, after the ExternalSecret reports Ready; the app's
+migrate initContainer retries until the database exists. CREATE IF NOT
+EXISTS is idempotent. The completed Job is kept (no ttlSecondsAfterFinished)
+so ArgoCD sees it in sync and never re-runs it: once per PR. Jobs are
+immutable — even kubectl replace fails because the live Job carries a
+server-generated controller-uid selector — so a spec change (chart bump)
+needs delete+recreate: Force=true,Replace=true.
+
+drop: PostDelete hook, runs after the app's resources are gone when ArgoCD
+deletes the preview Application (PR closed / pr-preview label removed), and
+is removed by its hook-delete-policy.
+*/ -}}
+{{- if .Values.previewDatabase.enabled }}
+{{- $jobs := list
+  (dict "suffix" "create-preview-db" "container" "create"
+        "annotations" (dict "argocd.argoproj.io/sync-wave" "0" "argocd.argoproj.io/sync-options" "Force=true,Replace=true")
+        "guard" "bad GITHUB_PR_NUMBER: $GITHUB_PR_NUMBER"
+        "sql" "CREATE DATABASE IF NOT EXISTS \\`${APP_NAME}_preview_${GITHUB_PR_NUMBER}\\` CHARACTER SET utf8mb4"
+        "done" "created")
+  (dict "suffix" "drop-preview-db" "container" "drop"
+        "annotations" (dict "argocd.argoproj.io/hook" "PostDelete" "argocd.argoproj.io/hook-delete-policy" "HookSucceeded")
+        "guard" "refusing to drop: bad GITHUB_PR_NUMBER '$GITHUB_PR_NUMBER'"
+        "sql" "DROP DATABASE IF EXISTS \\`${APP_NAME}_preview_${GITHUB_PR_NUMBER}\\`"
+        "done" "dropped") -}}
+{{- range $job := $jobs }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "k8s-app.previewDatabase.jobName" (dict "Release" $.Release "suffix" $job.suffix) }}
+  labels:
+    {{- include "k8s-app.labels" $ | nindent 4 }}
+  annotations:
+    {{- range $k, $v := $job.annotations }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+spec:
+  backoffLimit: {{ $.Values.previewDatabase.backoffLimit }}
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: {{ $job.container }}
+          image: {{ include "k8s-app.previewDatabase.image" $ }}
+          {{- with $.Values.previewDatabase.resources }}
+          resources: {{ toJson . }}
+          {{- end }}
+          env:
+            {{- include "k8s-app.previewDatabase.env" $ | nindent 12 }}
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              case "$GITHUB_PR_NUMBER" in '' | *[!0-9]*) echo "{{ $job.guard }}" >&2; exit 1;; esac
+              mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASS" \
+                -e "{{ $job.sql }}"
+              echo "{{ $job.done }} ${APP_NAME}_preview_${GITHUB_PR_NUMBER}"
+{{- end }}
+{{- end }}

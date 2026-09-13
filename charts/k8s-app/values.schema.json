@@ -13259,6 +13259,10 @@
             },
             "key": {
               "type": "string"
+            },
+            "knownHosts": {
+              "type": "string",
+              "minLength": 1
             }
           }
         },
@@ -13291,10 +13295,6 @@
               "pattern": "^/"
             }
           }
-        },
-        "knownHostsUrl": {
-          "type": "string",
-          "pattern": "^https://"
         }
       }
     },
@@ -13352,10 +13352,6 @@
           }
         },
         "backoffLimit": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "ttlSecondsAfterFinished": {
           "type": "integer",
           "minimum": 0
         },

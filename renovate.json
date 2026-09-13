@@ -42,9 +42,9 @@
       "commitMessageTopic": "bjw-s common library",
       "prBodyNotes": [
         "### k8s-app release checklist (manual)",
-        "1. Regenerate `charts/k8s-app/values.schema.json` (README: *Updating common*). CI fails until it matches the locked common schema.",
+        "1. Run `scripts/regen.sh` and commit: it rebuilds `values.schema.json` from the new common schema and the rendered snapshots under `examples/rendered/`. CI fails until both match. Review the snapshot diff: it is exactly what changes in every app's manifests.",
         "2. Bump `version` in `charts/k8s-app/Chart.yaml`. Renovate bumps **patch** for minor/patch common updates and does **not** bump for major updates: decide yourself whether k8s-app's public values API changed, and use a **major** k8s-app bump with migration notes if it did.",
-        "3. Read the upstream release notes and upgrade guide linked below; render `examples/scheduler` and compare."
+        "3. Read the upstream release notes and upgrade guide linked below."
       ]
     },
     {
@@ -78,15 +78,12 @@
       "commitMessagePrefix": "feat(k8s-app)!:"
     },
     {
-      "description": "git-sync image in k8s-app values.yaml (helm-values manager). No digest pinning: the tag is rendered as image:tag.",
+      "description": "Images in k8s-app values.yaml (helm-values manager: git-sync, mysql, curl...). No digest pinning: tags are rendered as image:tag and a digest suffix breaks the templates.",
       "matchManagers": [
         "helm-values"
       ],
-      "matchDepNames": [
-        "registry.k8s.io/git-sync/git-sync"
-      ],
       "prBodyNotes": [
-        "Bump `version` in `charts/k8s-app/Chart.yaml` (patch) before merging; CI enforces it. Renovate cannot bump it for values.yaml changes."
+        "Bump `version` in `charts/k8s-app/Chart.yaml` (patch), run `scripts/regen.sh` and commit the updated snapshots before merging; CI enforces both. Renovate cannot do either for values.yaml changes."
       ],
       "pinDigests": false
     },

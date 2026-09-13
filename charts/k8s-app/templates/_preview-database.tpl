@@ -1,5 +1,5 @@
 {{/*
-Shared pieces of the preview database Jobs (templates/preview-db-*.yaml).
+Shared pieces of the preview database Jobs (templates/preview-db.yaml).
 
 Naming: the per-PR identity is the helm release name (<app>-<pr>); the
 pull-request pod label is stamped by the chart's controller defaults from

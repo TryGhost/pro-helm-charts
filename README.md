@@ -123,13 +123,15 @@ touches nothing else (env, envFrom and your own volumes are preserved):
   dependencies under `/app/node_modules`; change
   `hotReload.app.{devCommand,run,nodeModules}` for others, or set
   `hotReload.app.args` to take over the script entirely.
-- `controllers.<controller>.initContainers.git-sync-init`: hydrates
-  `/etc/git-hosts/known_hosts` at boot from GitHub's meta API (TLS-anchored,
-  host-key verification on, nothing pinned to rotate), then does the one-time
-  clone.
+- `controllers.<controller>.initContainers.git-sync-init`: the one-time clone.
+- `configMaps.git-sync-hosts`: GitHub's published Ed25519 host key
+  (`hotReload.ssh.knownHosts`), mounted at `/etc/git-hosts/known_hosts` with
+  host-key verification on. Pinned on purpose: pods boot with no call to
+  GitHub's API (anonymous `api.github.com` is limited to 60 requests/hour per
+  egress IP, shared by every preview pod behind the cluster NAT).
 - `persistence.workspace` (emptyDir), `persistence.git-sync-ssh` (only the
   `<namespace>-git-sync-ssh` key of `app-secrets`, mode `0440`, mounted only into
-  the two git-sync containers) and `persistence.git-sync-hosts` (emptyDir).
+  the two git-sync containers) and `persistence.git-sync-hosts` (the ConfigMap).
 - `defaultPodOptions.securityContext.fsGroup: 65533` so git-sync can read the key.
 
 The deploy key is written to Secret Manager by the Terraform `argocd` module
@@ -154,7 +156,11 @@ plus `APP_NAME` (the release namespace) and `GITHUB_PR_NUMBER`
   ExternalSecret only materialises during the sync, so a PreSync hook would
   deadlock on a fresh namespace. The app's migrate initContainer retries until
   the database exists. `CREATE DATABASE IF NOT EXISTS ... CHARACTER SET utf8mb4`
-  is idempotent.
+  is idempotent. It runs **once per PR**: the completed Job has no
+  `ttlSecondsAfterFinished`, so it stays in the namespace, ArgoCD keeps seeing
+  it in sync, and nothing re-runs it (a TTL would delete it and `selfHeal`
+  would recreate and re-run it every time). Only a chart bump that changes the
+  Job spec recreates it, harmlessly. Its pod log stays available for debugging.
 - **drop**: `PostDelete` hook with `HookSucceeded` delete policy, runs
   `DROP DATABASE IF EXISTS` when ArgoCD deletes the preview Application.
 
@@ -207,6 +213,7 @@ helm lint --strict charts/k8s-app -f examples/minimal.yaml
 helm template app charts/k8s-app -n app -f examples/app-db-secrets.yaml
 helm template myapp charts/k8s-app -n myapp \
   -f examples/myapp/values.yaml -f examples/myapp/values.preview.yaml
+./scripts/regen.sh                            # after any chart change: schema + rendered snapshots
 ```
 
 `charts/k8s-app/charts/` (downloaded archives) is git-ignored; `Chart.yaml`
@@ -219,24 +226,25 @@ and `Chart.lock` are committed. Use `helm dependency update` only when changing
 first job of every release:
 
 - `helm dependency build` (fails if `Chart.yaml` and `Chart.lock` disagree).
-- `values.schema.json` must equal the locked common schema plus
-  `schemas/k8s-app.json` (see *Updating common*).
 - `helm lint --strict` with each example (minimal, app-secrets,
   app-db-secrets, and the full `myapp` staging/production/preview set) and a
   set of values the schema must reject.
-- `helm template` with each example plus assertions on resource names, Secret
-  and store references, namespace selectors, refresh interval, sync-wave
-  annotation, the untouched `{{ (.db | fromJson).* }}` ESO expressions, the
-  git-sync arguments (`--period=2s`, ref, repo), the `pnpm dev` command, and
-  that the SSH key is projected only into git-sync containers.
+- **Derived files are current**: `scripts/regen.sh` is run and the tree must
+  stay clean. It rebuilds `values.schema.json` and renders every example into
+  `examples/rendered/` (minus the `helm.sh/chart` label, so version bumps
+  don't touch snapshots). After any chart change, run it and commit; the
+  snapshot diff in the PR is exactly the manifest change every app will see.
+- A short list of invariants that a single snapshot cannot express: no
+  Kustomize placeholder, ESO `{{ (.db | fromJson).* }}` expressions untouched,
+  nothing injected into containers by `secretsInjection`, hot reload leaving
+  the app's env alone, the SSH key mounted only into git-sync, explicit
+  `hotReload.repo`/`ref` and `previewDatabase.secretName` overrides honoured.
 - On PRs: `charts/k8s-app` changes require a new `version` that has not been
   released.
 
-Rendering checks prove the manifests are what we expect, and an app-template
-deployment migrated to k8s-app renders the same resources (only
-`helm.sh/chart` labels differ). They do not prove runtime behaviour: ESO
-actually finding secrets, git-sync authenticating, the dev runner restarting.
-Verify those on a staging/preview deployment.
+Snapshots prove the manifests are what we expect. They do not prove runtime
+behaviour: ESO actually finding secrets, git-sync authenticating, the dev
+runner restarting. Verify those on a staging/preview deployment.
 
 ### Schema
 
@@ -245,8 +253,9 @@ top-level values; a subchart's schema is checked against that subchart's own
 values, which for a library dependency are empty. Upstream app-template solves
 this by copying common's schema verbatim, and k8s-app does the same and then
 adds its own properties: `values.schema.json` = common's schema +
-`schemas/k8s-app.json`. Unknown keys under `secretsInjection`/`hotReload`
-and invalid bjw-s values are both rejected.
+`schemas/k8s-app.json`, assembled by `scripts/regen.sh`. Unknown keys under
+`secretsInjection`/`hotReload`/`previewDatabase` and invalid bjw-s values are
+both rejected.
 
 ## Releases
 
@@ -314,17 +323,13 @@ manager is involved. Every Renovate PR is review-required; nothing automerges.
 What Renovate cannot do is decide what the change means for k8s-app's
 public API, so the PR body carries a checklist:
 
-1. Regenerate the schema so CI passes:
+1. Regenerate the derived files so CI passes, and read the snapshot diff:
+   it is the manifest change every app will get from the new common.
 
    ```sh
    helm repo add bjw-s https://bjw-s-labs.github.io/helm-charts
-   helm dependency build charts/k8s-app
-   tar -xzOf charts/k8s-app/charts/common-*.tgz common/values.schema.json \
-     | jq --slurpfile ext charts/k8s-app/schemas/k8s-app.json '
-         .["$id"] = "https://github.com/TryGhost/pro-helm-charts/blob/main/charts/k8s-app/values.schema.json"
-         | .title = "k8s-app values"
-         | .description = "bjw-s common library values (embedded verbatim from the locked common dependency) plus the options k8s-app adds: secretsInjection, hotReload and previewDatabase."
-         | .properties += $ext[0]' > charts/k8s-app/values.schema.json
+   ./scripts/regen.sh
+   git diff --stat examples/rendered
    ```
 
 2. Pick the k8s-app version. For minor/patch common updates Renovate
@@ -340,8 +345,9 @@ public API, so the PR body carries a checklist:
 
 3. Merge; the release workflow publishes the new version.
 
-The git-sync image (`hotReload.gitSync.image`) and the pinned GitHub Actions
-are updated by Renovate the same way (review-required, patch bump reminder).
+The images in `values.yaml` (git-sync, mysql) and the pinned GitHub Actions
+are updated by Renovate the same way (review-required; image bumps also need
+`scripts/regen.sh` and a patch bump, which the PR body says).
 
 ## Versioning and adoption
 

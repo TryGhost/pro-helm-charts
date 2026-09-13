@@ -56,16 +56,6 @@ jobs:
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
-      - name: Ensure the gh-pages branch exists
-        run: |
-          if git ls-remote --exit-code --heads origin gh-pages >/dev/null; then
-            echo "gh-pages exists"; exit 0
-          fi
-          git switch --orphan gh-pages
-          git commit --allow-empty -m "Initialise Helm repository index branch"
-          git push origin gh-pages
-          git checkout --force "$GITHUB_REF_NAME"
-
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
           version: ${{ env.HELM_VERSION }}

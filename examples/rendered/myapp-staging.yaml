@@ -1,0 +1,307 @@
+---
+# Source: k8s-app/templates/common.yaml
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: myapp
+  labels:
+    app.kubernetes.io/instance: myapp
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: myapp
+  namespace: myapp
+---
+# Source: k8s-app/templates/common.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myapp
+  labels:
+    app.kubernetes.io/instance: myapp
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: myapp
+  namespace: myapp
+data:
+  NODE_ENV: production
+  db__client: mysql2
+  db__connection__charset: utf8mb4
+  db__connection__database: myapp
+---
+# Source: k8s-app/templates/common.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: myapp
+  labels:
+    app.kubernetes.io/instance: myapp
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: myapp
+    app.kubernetes.io/service: myapp
+  namespace: myapp
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/controller: main
+    app.kubernetes.io/instance: myapp
+    app.kubernetes.io/name: myapp
+---
+# Source: k8s-app/templates/common.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp
+  labels:
+    app.kubernetes.io/controller: main
+    app.kubernetes.io/instance: myapp
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: myapp
+  namespace: myapp
+spec:
+  revisionHistoryLimit: 3
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/controller: main
+      app.kubernetes.io/name: myapp
+      app.kubernetes.io/instance: myapp
+  template:
+    metadata:
+      annotations: 
+        checksum/configMaps: 39545143d7662e92571701c1b04ee59006e58aca76c93818e6b84b6e24b2b5a6
+      labels: 
+        app.kubernetes.io/controller: main
+        app.kubernetes.io/instance: myapp
+        app.kubernetes.io/name: myapp
+    spec: 
+      enableServiceLinks: false
+      serviceAccountName: myapp
+      automountServiceAccountToken: false
+      hostIPC: false
+      hostNetwork: false
+      hostPID: false
+      dnsPolicy: ClusterFirst
+      imagePullSecrets: 
+        - name: ghost
+      initContainers: 
+        - command:
+          - ./node_modules/.bin/knex
+          - migrate:latest
+          env:
+          - name: APP_NAME
+            value: myapp
+          - name: GITHUB_PR_NUMBER
+            value: ""
+          - name: db__connection__host
+            valueFrom:
+              secretKeyRef:
+                key: host
+                name: app-db-secrets
+          - name: db__connection__password
+            valueFrom:
+              secretKeyRef:
+                key: password
+                name: app-db-secrets
+          - name: db__connection__port
+            valueFrom:
+              secretKeyRef:
+                key: port
+                name: app-db-secrets
+          - name: db__connection__ssl__ca
+            valueFrom:
+              secretKeyRef:
+                key: ssl_ca
+                name: app-db-secrets
+          - name: db__connection__user
+            valueFrom:
+              secretKeyRef:
+                key: user
+                name: app-db-secrets
+          envFrom:
+          - configMapRef:
+              name: myapp
+          image: registry.digitalocean.com/ghost/myapp:latest
+          name: migrate
+      containers: 
+        - command:
+          - node
+          - src/main.js
+          env:
+          - name: APP_NAME
+            value: myapp
+          - name: GITHUB_PR_NUMBER
+            value: ""
+          - name: db__connection__host
+            valueFrom:
+              secretKeyRef:
+                key: host
+                name: app-db-secrets
+          - name: db__connection__password
+            valueFrom:
+              secretKeyRef:
+                key: password
+                name: app-db-secrets
+          - name: db__connection__port
+            valueFrom:
+              secretKeyRef:
+                key: port
+                name: app-db-secrets
+          - name: db__connection__ssl__ca
+            valueFrom:
+              secretKeyRef:
+                key: ssl_ca
+                name: app-db-secrets
+          - name: db__connection__user
+            valueFrom:
+              secretKeyRef:
+                key: user
+                name: app-db-secrets
+          envFrom:
+          - configMapRef:
+              name: myapp
+          image: registry.digitalocean.com/ghost/myapp:latest
+          livenessProbe:
+            httpGet:
+              path: /readyz
+              port: 3000
+            periodSeconds: 15
+          name: main
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 3000
+            periodSeconds: 5
+          resources:
+            limits:
+              cpu: 1
+              memory: 1Gi
+            requests:
+              cpu: 500m
+              memory: 256Mi
+---
+# Source: k8s-app/templates/app-db-secrets.yaml
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: app-db-secrets
+  labels:
+    app.kubernetes.io/name: myapp
+    app.kubernetes.io/instance: myapp
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    # Wave -1: the Secret must exist (ES Ready) before wave-0 consumers start
+    argocd.argoproj.io/sync-wave: "-1"
+    # Namespace-shared infrastructure, consumed by every release in the
+    # namespace: previews bootstrap these ExternalSecrets and the staging
+    # release later co-manages/adopts them. Prune=false means disabling
+    # secretsInjection orphans them instead of deleting; Delete=false means
+    # Application deletion (PR preview close) leaves them in place — the same
+    # convention as addon Namespaces.
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+spec:
+  refreshInterval: 5m
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: gcp-secrets-manager
+  dataFrom:
+    - find:
+        name:
+          regexp: "^(stg|prd)-.+db$"
+        tags:
+          namespace: myapp
+        # Stated explicitly (ESO defaults them) so ArgoCD does not see drift
+        conversionStrategy: Default
+        decodingStrategy: None
+      # Normalise "<env>-<app>db" to "db" so the template below is the same
+      # for every app. Exactly one secret must match; two would collide.
+      rewrite:
+        - regexp:
+            source: "^(stg|prd)-.+db$"
+            target: "db"
+  target:
+    name: app-db-secrets
+    # Explode the JSON into one key per field. The template replaces the
+    # fetched data, so the raw blob is not written to the Secret.
+    template:
+      engineVersion: v2
+      data:
+        # VPC hostname: workloads run in the same DO VPC as the cluster.
+        host: '{{ (.db | fromJson).private_host }}'
+        public_host: '{{ (.db | fromJson).host }}'
+        port: '{{ (.db | fromJson).port }}'
+        user: '{{ (.db | fromJson).user }}'
+        password: '{{ (.db | fromJson).password }}'
+        # DO's default database (defaultdb) — apps normally set their own.
+        database: '{{ (.db | fromJson).database }}'
+        uri: '{{ (.db | fromJson).private_uri }}'
+        public_uri: '{{ (.db | fromJson).uri }}'
+        # Cluster CA certificate (PEM); DO managed MySQL requires TLS.
+        ssl_ca: '{{ (.db | fromJson).ssl_ca }}'
+---
+# Source: k8s-app/templates/app-secrets.yaml
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: app-secrets
+  labels:
+    app.kubernetes.io/name: myapp
+    app.kubernetes.io/instance: myapp
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    # Wave -1: the Secret must exist (ES Ready) before wave-0 consumers start
+    argocd.argoproj.io/sync-wave: "-1"
+    # Namespace-shared infrastructure, consumed by every release in the
+    # namespace: previews bootstrap these ExternalSecrets and the staging
+    # release later co-manages/adopts them. Prune=false means disabling
+    # secretsInjection orphans them instead of deleting; Delete=false means
+    # Application deletion (PR preview close) leaves them in place — the same
+    # convention as addon Namespaces.
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+spec:
+  refreshInterval: 5m
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: gcp-secrets-manager
+  target:
+    name: app-secrets
+  dataFrom:
+    - find:
+        # Stated explicitly (ESO defaults them) so ArgoCD does not see drift
+        conversionStrategy: Default
+        decodingStrategy: None
+        tags:
+          namespace: myapp
+---
+# Source: k8s-app/templates/common.yaml
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: HTTPRoute
+metadata:
+  name: myapp
+  labels:
+    app.kubernetes.io/instance: myapp
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: myapp
+  namespace: myapp
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: shared-internal-gateway
+      namespace: "default"
+      sectionName: "https"
+  hostnames:
+    - "myapp.ghostinfra.net"
+  rules:
+    - backendRefs:
+        - group: ""
+          kind: Service
+          name: myapp
+          namespace: myapp
+          port: 3000
+          weight: 1

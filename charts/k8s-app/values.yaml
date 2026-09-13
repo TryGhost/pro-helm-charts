@@ -99,10 +99,12 @@ hotReload:
     # module: per-PR preview releases are named <app>-<pr>, but the deploy
     # key is provisioned per app, not per release.
     key: ""
-  # -- Hydrates known_hosts at pod boot: git-sync-init fetches GitHub's
-  # published host keys from the meta API (TLS-anchored) into an emptyDir
-  # shared with the sidecar — nothing pinned, nothing to rotate.
-  knownHostsUrl: https://api.github.com/meta
+    # -- Pinned SSH host key(s) for the git host, rendered into a ConfigMap
+    # mounted at /etc/git-hosts/known_hosts (host-key verification on). No
+    # runtime lookups: pods boot without network calls to GitHub's API.
+    # https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints
+    knownHosts: |
+      github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
   app:
     # -- Entrypoint for the app container while hot reloading. The default
     # runs the generated args script under tini.
@@ -143,6 +145,8 @@ previewDatabase:
     password: password
   # -- Job retries before giving up.
   backoffLimit: 2
-  # -- Seconds a finished Job is kept before garbage collection.
-  ttlSecondsAfterFinished: 3600
+  # No ttlSecondsAfterFinished: the completed create Job stays for the life
+  # of the preview so ArgoCD never sees it missing and re-runs it (with a TTL
+  # + selfHeal it would re-run every time the TTL fired). It is deleted with
+  # the Application; the drop hook is removed by its hook-delete-policy.
   resources: {}
