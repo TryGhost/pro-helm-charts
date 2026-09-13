@@ -13259,10 +13259,6 @@
             },
             "key": {
               "type": "string"
-            },
-            "knownHosts": {
-              "type": "string",
-              "minLength": 1
             }
           }
         },
@@ -13293,6 +13289,37 @@
             "nodeModules": {
               "type": "string",
               "pattern": "^/"
+            }
+          }
+        },
+        "knownHostsInit": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "image": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "repository": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "tag": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "repository",
+                "tag"
+              ]
+            },
+            "url": {
+              "type": "string",
+              "pattern": "^https://"
+            },
+            "resources": {
+              "type": "object"
             }
           }
         }
