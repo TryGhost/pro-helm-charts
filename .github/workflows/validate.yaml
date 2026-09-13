@@ -139,7 +139,7 @@ jobs:
           echo "preview: hot reload"
           f=out/myapp-preview.yaml
           dep=$(yq 'select(.kind=="Deployment")' "$f")
-          [ "$(yq '.spec.template.spec.initContainers[].name' <<<"$dep" | tr '\n' ' ')" = "git-sync-init migrate " ]
+          [ "$(yq '.spec.template.spec.initContainers[].name' <<<"$dep" | tr '\n' ' ')" = "git-hosts-init git-sync-init migrate " ]
           [ "$(yq '.spec.template.spec.containers[].name' <<<"$dep" | tr '\n' ' ')" = "git-sync main " ]
           [ "$(yq '.spec.template.spec.securityContext.fsGroup' <<<"$dep")" = "65533" ]
           gs=$(yq '.spec.template.spec.containers[] | select(.name=="git-sync")' <<<"$dep")
@@ -161,6 +161,11 @@ jobs:
           [ "$(yq '.env[] | select(.name=="GITSYNC_REF") | .value' <<<"$ov")" = "refs/heads/main" ]
           yq '.args[]' <<<"$gs" | grep -cx -- '--stale-worktree-timeout=5m'
           yq '.args[]' <<<"$gs" | grep -cx -- '--ssh-known-hosts-file=/etc/git-hosts/known_hosts'
+          hosts=$(yq '.spec.template.spec.initContainers[] | select(.name=="git-hosts-init")' <<<"$dep")
+          # expected image comes from the chart defaults so Renovate bumps don't break this
+          [ "$(yq '.image' <<<"$hosts")" = "$(yq '.hotReload.knownHostsInit.image.repository + ":" + .hotReload.knownHostsInit.image.tag' "$CHART/values.yaml")" ]
+          [ "$(yq '.volumeMounts[] | select(.name=="git-sync-hosts") | .mountPath' <<<"$hosts")" = "/etc/git-hosts" ]
+          [ "$(yq '.spec.template.spec.volumes[] | select(.name=="git-sync-hosts") | .emptyDir' <<<"$dep")" = "{}" ]
           init=$(yq '.spec.template.spec.initContainers[] | select(.name=="git-sync-init")' <<<"$dep")
           yq '.args[]' <<<"$init" | grep -cx -- '--one-time'
           ! yq '.args[]' <<<"$init" | grep -c -- '--period'
@@ -184,7 +189,8 @@ jobs:
           echo "pull-request pod label and default pull secret from chart"
           [ "$(yq '.spec.template.metadata.labels["pull-request"]' <<<"$dep")" = "__GITHUB_PR_NUMBER__" ]
           [ "$(yq '.spec.template.spec.imagePullSecrets[0].name' <<<"$dep")" = "ghost" ]
-          [ "$(yq -N 'select(.kind=="ConfigMap") | .metadata.name' "$f" | sort | tr '\n' ' ')" = "myapp-config myapp-git-sync-hosts " ]
+          # a single configMap left (the pinned known_hosts one is gone) gets the bare release name
+          [ "$(yq -N 'select(.kind=="ConfigMap") | .metadata.name' "$f" | sort | tr '\n' ' ')" = "myapp " ]
           [ "$(yq 'select(.kind=="HTTPRoute") | .spec.hostnames[0]' "$f")" = "myapp-__GITHUB_PR_NUMBER__.ghostinfra.net" ]
 
       - name: Check preview database rendering
