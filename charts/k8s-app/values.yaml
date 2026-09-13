@@ -11,13 +11,15 @@
 # options k8s-app adds. Upstream keeps its values.yaml empty for the same
 # reason: the library defaults are merged in at render time.
 
-# -- Per-render preview facts, set by gitops-sync when it snapshots a PR
-# preview (values are literals at render time; nothing is read from pod
-# metadata). Empty outside previews.
+# -- Per-render preview facts. Apps never set these: the pull-request
+# ApplicationSet passes `preview.prNumber` as a Helm parameter
+# (`k8s-app.preview.prNumber={{.number}}` on the umbrella chart), so values
+# are literals at render time and nothing is read from pod metadata. Empty
+# outside previews.
 preview:
-  # -- Pull request number. Fills the injected GITHUB_PR_NUMBER env var, the
-  # pull-request pod label, hotReload's git ref and previewDatabase's
-  # database name.
+  # -- Pull request number (set by the ApplicationSet). Fills the injected
+  # GITHUB_PR_NUMBER env var, the pull-request pod label, hotReload's git ref
+  # and previewDatabase's database name.
   prNumber: ""
   # -- SSH clone URL for hotReload. Empty = derived as
   # git@github.com:<owner>/<release namespace>.git (app name == namespace).

@@ -1,6 +1,3 @@
-preview:
-  prNumber: __GITHUB_PR_NUMBER__
-
 hotReload:
   enabled: true
 

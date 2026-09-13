@@ -30,7 +30,11 @@ render() { # <output name> <release> <namespace> <values files...>
 render minimal        app   app   -f examples/minimal.yaml
 render app-secrets    app   app   -f examples/app-secrets.yaml
 render app-db-secrets app   app   -f examples/app-db-secrets.yaml
-for env in staging production preview; do
+for env in staging production; do
   render "myapp-$env" myapp myapp -f examples/myapp/values.base.yaml -f "examples/myapp/values.$env.yaml"
 done
+# preview.prNumber is a Helm parameter set by the pull-request ApplicationSet
+# ({{.number}}), never written by apps; the token stands in for it here.
+render myapp-preview myapp myapp -f examples/myapp/values.base.yaml -f examples/myapp/values.preview.yaml \
+  --set preview.prNumber=__GITHUB_PR_NUMBER__
 echo "regenerated: $CHART/values.schema.json examples/rendered/"

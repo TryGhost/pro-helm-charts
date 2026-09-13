@@ -48,11 +48,13 @@ set by gitops-sync on preview renders; empty elsewhere) as literal env vars,
 so values can reference `$(APP_NAME)` / `$(GITHUB_PR_NUMBER)` directly
 (e.g. a per-PR database name). User-declared env with the same name wins.
 
-Preview facts arrive as values, not pod metadata: gitops-sync fills the
-`__GITHUB_PR_NUMBER__` / `__IMAGE_SHA__` tokens the app declares in its
-values when snapshotting, and `preview.prNumber` drives the injected env,
-the `pull-request` pod label, hotReload's git ref and previewDatabase's
-database name. The chart also defaults `defaultPodOptions.imagePullSecrets`
+Preview facts arrive as values, not pod metadata, and apps do not write
+them: the pull-request ApplicationSet passes `preview.prNumber` as a Helm
+parameter (`k8s-app.preview.prNumber={{.number}}` on the umbrella chart), and
+it drives the injected env, the `pull-request` pod label, hotReload's git ref
+and previewDatabase's database name. gitops-sync still fills the
+`__IMAGE_SHA__` token in the image tag, and `__GITHUB_PR_NUMBER__` anywhere
+an app chooses to use it (typically the preview route hostname). The chart also defaults `defaultPodOptions.imagePullSecrets`
 to the DOKS registry integration's `ghost` secret (a non-empty user list
 wins) and deployment/statefulset strategy to RollingUpdate.
 
@@ -108,8 +110,8 @@ touches nothing else (env, envFrom and your own volumes are preserved):
   Repository and ref are literals baked in at render time through git-sync's
   `GITSYNC_REPO` / `GITSYNC_REF` env: the clone URL derived as
   `git@github.com:<preview.owner>/<release namespace>.git` and the ref as
-  `refs/pull/<preview.prNumber>/head` (gitops-sync fills `preview.prNumber`
-  when snapshotting). Nothing per-PR needs to be written into values. Set
+  `refs/pull/<preview.prNumber>/head` (the ApplicationSet passes `preview.prNumber`
+  as a Helm parameter). Nothing per-PR needs to be written into values. Set
   `hotReload.repo` / `hotReload.ref` to override (e.g. when the repository
   name isn't the namespace: `daisy-js` vs `Daisy.js`).
 - `controllers.<controller>.containers.git-sync`: sidecar polling every `2s`
@@ -212,7 +214,7 @@ helm dependency build charts/k8s-app          # fetches charts/common-<ver>.tgz 
 helm lint --strict charts/k8s-app -f examples/minimal.yaml
 helm template app charts/k8s-app -n app -f examples/app-db-secrets.yaml
 helm template myapp charts/k8s-app -n myapp \
-  -f examples/myapp/values.base.yaml -f examples/myapp/values.preview.yaml
+  -f examples/myapp/values.base.yaml -f examples/myapp/values.preview.yaml --set preview.prNumber=123
 ./scripts/regen.sh                            # after any chart change: schema + rendered snapshots
 ```
 
@@ -371,7 +373,7 @@ In the app's `.k8s`:
 1. Replace `base/`, `overlays/` and every `kustomization.yaml` with the flat
    layout: `Chart.yaml` + `values.base.yaml` + `values.<env>.yaml` +
    `values.preview.yaml`, using `__IMAGE_SHA__` for the image tag and
-   `__GITHUB_PR_NUMBER__` for preview-only facts (gitops-sync fills both).
+   `__GITHUB_PR_NUMBER__` where a preview-only value needs the PR number, e.g. the route hostname (gitops-sync fills both; `preview.prNumber` itself comes from the ApplicationSet).
 2. `values.base.yaml`: add
 
    ```yaml
