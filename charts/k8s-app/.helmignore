@@ -9,3 +9,6 @@
 .vscode/
 # Schema fragment merged into values.schema.json (see README)
 schemas/
+
+# Rendered snapshots checked by CI (scripts/regen.sh)
+tests/

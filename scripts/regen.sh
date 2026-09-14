@@ -5,10 +5,10 @@
 #   charts/k8s-app/values.schema.json  common's schema (from the locked
 #                                      dependency archive) + schemas/k8s-app.json
 #   charts/k8s-app/README.md           values tables between <!-- values --> markers
-#   examples/rendered/*.yaml           helm template of every example, documents
-#                                      sorted by kind + name, minus the
-#                                      helm.sh/chart label so version bumps
-#                                      don't touch every snapshot
+#   charts/k8s-app/tests/snapshots/    helm template of examples/k8s-app per
+#                                      environment, documents sorted by kind +
+#                                      name, minus the helm.sh/chart label so
+#                                      version bumps don't touch every snapshot
 #
 # Needs: helm (with the bjw-s repo added), jq.
 set -eu
@@ -43,23 +43,20 @@ while IFS= read -r line || [ -n "$line" ]; do
 done < "$md"
 mv "$out" "$md"
 
-render() { # <output name> <release> <namespace> <values files...>
-  out=$1 rel=$2 ns=$3; shift 3
+EX=examples/k8s-app
+render() { # <output name> <values files...>
+  out=$1; shift
   # documents sorted by kind + name: the library's own emission order is not
   # stable between runs (ConfigMaps in particular), and a snapshot must be
-  helm template "$rel" "$CHART" -n "$ns" "$@" \
+  helm template myapp "$CHART" -n myapp -f "$EX/values.base.yaml" "$@" \
     | grep -v '^# Source: ' \
     | yq ea 'select(. != null) as $d ireduce ([]; . + [$d]) | sort_by(.kind, .metadata.name) | .[] | split_doc' \
-    | grep -v '^\s*helm.sh/chart: ' > "examples/rendered/$out.yaml"
+    | grep -v '^\s*helm.sh/chart: ' > "$CHART/tests/snapshots/$out.yaml"
 }
-render minimal        app   app   -f examples/minimal.yaml
-render app-secrets    app   app   -f examples/app-secrets.yaml
-render app-db-secrets app   app   -f examples/app-db-secrets.yaml
 for env in staging production; do
-  render "myapp-$env" myapp myapp -f examples/myapp/values.base.yaml -f "examples/myapp/values.$env.yaml"
+  render "$env" -f "$EX/values.$env.yaml"
 done
 # preview.prNumber is a Helm parameter set by the pull-request ApplicationSet
 # ({{.number}}), never written by apps; the token stands in for it here.
-render myapp-preview myapp myapp -f examples/myapp/values.base.yaml -f examples/myapp/values.preview.yaml \
-  --set preview.prNumber=__GITHUB_PR_NUMBER__
-echo "regenerated: $CHART/values.schema.json $CHART/README.md examples/rendered/"
+render preview -f "$EX/values.preview.yaml" --set preview.prNumber=__GITHUB_PR_NUMBER__
+echo "regenerated: $CHART/values.schema.json $CHART/README.md $CHART/tests/snapshots/"

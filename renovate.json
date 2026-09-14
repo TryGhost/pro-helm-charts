@@ -42,7 +42,7 @@
       "commitMessageTopic": "bjw-s common library",
       "prBodyNotes": [
         "### k8s-app release checklist (manual)",
-        "1. Run `scripts/regen.sh` and commit: it rebuilds `values.schema.json` from the new common schema and the rendered snapshots under `examples/rendered/`. CI fails until both match. Review the snapshot diff: it is exactly what changes in every app's manifests.",
+        "1. Run `scripts/regen.sh` and commit: it rebuilds `values.schema.json` from the new common schema and the rendered snapshots under `charts/k8s-app/tests/snapshots/`. CI fails until both match. Review the snapshot diff: it is exactly what changes in every app's manifests.",
         "2. Bump `version` in `charts/k8s-app/Chart.yaml`. Renovate bumps **patch** for minor/patch common updates and does **not** bump for major updates: decide yourself whether k8s-app's public values API changed, and use a **major** k8s-app bump with migration notes if it did.",
         "3. Read the upstream release notes and upgrade guide linked below."
       ]

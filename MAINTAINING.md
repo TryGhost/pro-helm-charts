@@ -5,9 +5,9 @@
 ```sh
 helm repo add bjw-s https://bjw-s-labs.github.io/helm-charts
 ./scripts/regen.sh                            # dependency build + every derived file (see below)
-helm lint --strict charts/k8s-app -f examples/minimal.yaml
+helm lint --strict charts/k8s-app -f examples/k8s-app/values.base.yaml
 helm template myapp charts/k8s-app -n myapp \
-  -f examples/myapp/values.base.yaml -f examples/myapp/values.preview.yaml --set preview.prNumber=123
+  -f examples/k8s-app/values.base.yaml -f examples/k8s-app/values.preview.yaml --set preview.prNumber=123
 ```
 
 `charts/k8s-app/charts/` (downloaded archives) is git-ignored; `Chart.yaml`
@@ -23,7 +23,7 @@ chart change and commit the result; CI runs it and fails on a dirty tree.
 |---|---|
 | `charts/k8s-app/values.schema.json` | common's schema (from the locked archive) + `schemas/k8s-app.json` |
 | `charts/k8s-app/README.md` values tables | `values.schema.json`, spliced between the `<!-- values: ... -->` markers by `scripts/values-reference.jq` |
-| `examples/rendered/*.yaml` | `helm template` of every example, documents sorted by kind and name (the library's emission order is not stable), minus the `helm.sh/chart` label so version bumps don't churn them |
+| `charts/k8s-app/tests/snapshots/{staging,production,preview}.yaml` | `helm template` of `examples/k8s-app` per environment, documents sorted by kind and name (the library's emission order is not stable), minus the `helm.sh/chart` label so version bumps don't churn them |
 
 The prose in `charts/k8s-app/README.md` is hand-written; only the tables
 between markers are regenerated. Options k8s-app adds are documented in
@@ -45,7 +45,7 @@ are both rejected.
 job of every release:
 
 - `helm dependency build` (fails if `Chart.yaml` and `Chart.lock` disagree).
-- `helm lint --strict` with each example, and values the schema must reject.
+- `helm lint --strict` with each environment of `examples/k8s-app`, and values the schema must reject.
 - `scripts/regen.sh` leaves the tree clean (schema, README tables, snapshots).
   The snapshot diff in a PR is exactly the manifest change every app will see.
 - Invariants a snapshot cannot express: no Kustomize placeholder, ESO

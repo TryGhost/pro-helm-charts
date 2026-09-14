@@ -49,8 +49,8 @@ the directory into the k8s repo, fills `__IMAGE_SHA__` and
 `__GITHUB_PR_NUMBER__`, wraps the values under the `k8s-app:` key (Helm scopes
 subchart values under the dependency name) and ArgoCD renders the result with
 plain Helm. The complete reference layout is
-[`examples/myapp`](../../examples/myapp), and its rendered output is under
-[`examples/rendered`](../../examples/rendered).
+[`examples/k8s-app`](../../examples/k8s-app), and what it renders to per
+environment is under [`tests/snapshots`](tests/snapshots).
 
 ```yaml
 # .k8s/Chart.yaml
@@ -961,8 +961,8 @@ controllers:
 ```
 
 Assumes External Secrets Operator and the ClusterSecretStore exist in the
-cluster. Examples: [`examples/app-secrets.yaml`](../../examples/app-secrets.yaml),
-[`examples/app-db-secrets.yaml`](../../examples/app-db-secrets.yaml).
+cluster. Example: [`examples/k8s-app/values.base.yaml`](../../examples/k8s-app/values.base.yaml);
+the rendered ExternalSecrets are in [`tests/snapshots/staging.yaml`](tests/snapshots/staging.yaml).
 
 <!-- values: secretsInjection -->
 | Key | Type | Default | Description |
@@ -1017,7 +1017,7 @@ hotReload:
   enabled: true
 ```
 
-Example: [`examples/myapp/values.preview.yaml`](../../examples/myapp/values.preview.yaml).
+Example: [`examples/k8s-app/values.preview.yaml`](../../examples/k8s-app/values.preview.yaml).
 
 <!-- values: hotReload -->
 | Key | Type | Default | Description |
