@@ -60,7 +60,7 @@ version: 0.0.0
 dependencies:
   - name: k8s-app
     repository: https://tryghost.github.io/pro-helm-charts
-    version: 0.7.0
+    version: 0.8.0
 ```
 
 ```yaml
@@ -84,7 +84,7 @@ Outside gitops, the chart installs like any other:
 
 ```sh
 helm repo add ghost https://tryghost.github.io/pro-helm-charts
-helm install myapp ghost/k8s-app --version 0.7.0 -n myapp -f values.yaml
+helm install myapp ghost/k8s-app --version 0.8.0 -n myapp -f values.yaml
 ```
 
 Every release bundles its `common` dependency, so consumers never add the
@@ -511,30 +511,26 @@ service:
 
 ## Gateway API routes: `route`
 
-An `HTTPRoute` (or GRPC/TCP/TLS/UDP route via `kind`) attached to a Gateway
-through `parentRefs`. `rules` defaults to sending everything to the primary
-Service, so a route usually needs only `parentRefs` and `hostnames`. Our
-clusters expose a shared internal Gateway; the convention is to declare the
-route once in `values.base.yaml` with `enabled: false` and enable it with the
-environment's hostname in each `values.<env>.yaml`. Deploying the route into
-the Gateway's namespace (`namespaceOverride`) auto-generates the
-`ReferenceGrant` it needs.
+An `HTTPRoute` (or GRPC/TCP/TLS/UDP route via `kind`) attached to a Gateway.
+`rules` defaults to sending everything to the primary Service, and the chart
+fills `parentRefs` from the route's `gateway` selector (see
+[gateways](#k8s-app-gateways-gateway)), so a route usually needs only
+`hostnames`. The convention is to declare routes only in the environments
+that expose the app:
 
 ```yaml
-# values.base.yaml
-route:
-  main:
-    enabled: false
-    parentRefs:
-      - name: shared-internal-gateway
-        namespace: default
-        sectionName: https
 # values.staging.yaml
 route:
   main:
     enabled: true
     hostnames: [myapp.ghostinfra.net]
+    # gateway: shared-internal   (the default; see the gateways section)
 ```
+
+Explicit `parentRefs` remain the escape hatch and win over the selector
+(missing `namespace`/`sectionName` are filled with the shared-Gateway
+conventions `default`/`https`). Deploying the route into another namespace
+(`namespaceOverride`) auto-generates the `ReferenceGrant` it needs.
 
 <!-- values: route -->
 | Key | Type | Default | Description |
@@ -543,6 +539,7 @@ route:
 | `route.<id>.annotations` | object / null |  | Annotations to set on the item. |
 | `route.<id>.enabled` | boolean | `true` | Set to false to disable the Route. |
 | `route.<id>.forceRename` | string |  | Override the default resource name. Mutually exclusive with prefix and suffix. |
+| `route.<id>.gateway` | string (shared-internal, shared-external, dedicated-internal, dedicated-external) |  | Which gateway this route attaches to when parentRefs is not set: shared-internal (default), shared-external, dedicated-internal or dedicated-external. dedicated-* renders a per-app Gateway (its own DO load balancer) with certificate and HTTP->HTTPS redirect. |
 | `route.<id>.hostnames` | array |  | Host addresses for the Route. Helm templates are supported. |
 | `route.<id>.kind` | string (GRPCRoute, HTTPRoute, TCPRoute, TLSRoute, UDPRoute) |  | Route kind. Supported values: GRPCRoute, HTTPRoute, TCPRoute, TLSRoute, UDPRoute. |
 | `route.<id>.labels` | object / null |  | Labels to set on the item. |
@@ -1106,6 +1103,75 @@ controllers:
 | `previewDatabase.secretName` | string | `"app-db-secrets"` | Secret holding the MySQL connection details (pairs with secretsInjection.database, which creates app-db-secrets). |
 <!-- /values -->
 
+## k8s-app: gateways `gateway`
+
+Every route attaches to a Gateway selected by `route.<id>.gateway`:
+
+| selector | attaches to | load balancer |
+|---|---|---|
+| `shared-internal` (default) | the cluster's `shared-internal-gateway` | shared, VPC-only |
+| `shared-external` | the cluster's `shared-gateway` | shared, public |
+| `dedicated-internal` | a Gateway rendered by this chart | this app's own, VPC-only |
+| `dedicated-external` | a Gateway rendered by this chart | this app's own, public |
+
+`shared-*` needs nothing besides the selector: the Gateways, their wildcard
+certificates and the HTTP->HTTPS redirect are cluster infrastructure
+(terraform + cluster-addons).
+
+`dedicated-*` renders, per referenced network, in the release namespace:
+
+- a **Gateway** `<namespace>-gateway-<network>` (`gatewayClassName` from
+  `gateway.dedicated.className`, DO load-balancer name pinned to the Gateway
+  name, `INTERNAL` network annotation for `dedicated-internal`,
+  `allowedRoutes` restricted to the release namespace);
+- a cert-manager **Certificate** for the hostnames of the routes attached to
+  it, against the `gateway.dedicated.issuer` ClusterIssuer (the shared
+  wildcard certs do not apply to a dedicated Gateway) — the render fails if
+  no attached route declares hostnames;
+- a catch-all HTTP->HTTPS redirect **HTTPRoute** on its port-80 listener.
+
+Each dedicated Gateway is a real DigitalOcean load balancer with its own
+cost and IP, created when the first route references it and pruned when none
+does (recreating one later gets a new IP; external-dns re-publishes DNS).
+Renders with `preview.prNumber` set refuse dedicated gateways — a load
+balancer per PR is never intended.
+
+Mixing is per route: one route on `shared-external` and another on
+`dedicated-external` renders one dedicated Gateway and attaches each route
+where it asked.
+
+```yaml
+route:
+  api:
+    enabled: true
+    hostnames: [api.ghostinfra.com]
+    gateway: shared-external
+  partner:
+    enabled: true
+    hostnames: [partner.ghostinfra.com]
+    gateway: dedicated-external
+```
+
+`gateway` holds only platform facts (shared Gateway names) and dedicated
+configuration; it selects nothing by itself:
+
+<!-- values: gateway -->
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `gateway` | object |  | Gateway attachment: platform facts and dedicated-gateway configuration. Routes select their gateway via route.<id>.gateway; this key selects nothing by itself. |
+| `gateway.dedicated` | object |  | Configuration for dedicated (per-app) Gateways, rendered when a route selects dedicated-internal or dedicated-external. Each is its own DO load balancer. |
+| `gateway.dedicated.annotations` | object | `{}` | Extra infrastructure annotations (DO load-balancer annotations). |
+| `gateway.dedicated.className` | string | `"cilium"` | GatewayClass for dedicated Gateways. |
+| `gateway.dedicated.issuer` | string | `"letsencrypt-prod"` | ClusterIssuer for each dedicated Gateway's per-host certificate. |
+| `gateway.shared` | object |  | The terraform-managed shared per-cluster Gateways. |
+| `gateway.shared.external` | object |  | The shared public Gateway. |
+| `gateway.shared.external.name` | string | `"shared-gateway"` | Name of the shared public Gateway. |
+| `gateway.shared.external.namespace` | string | `"default"` | Namespace it lives in. |
+| `gateway.shared.internal` | object |  | The shared internal (VPC-only) Gateway. |
+| `gateway.shared.internal.name` | string | `"shared-internal-gateway"` | Name of the shared internal (VPC-only) Gateway. |
+| `gateway.shared.internal.namespace` | string | `"default"` | Namespace it lives in. |
+<!-- /values -->
+
 ## k8s-app: defaults applied to every release
 
 - **Env injection**: every container and init container gets `APP_NAME` (the
@@ -1122,6 +1188,9 @@ controllers:
   the default ServiceAccount, and the chart uses its own.
 - **`strategy: RollingUpdate`** for deployments and statefulsets unless the
   controller sets `strategy`.
+- **Route `parentRefs`** from each route's `gateway` selector
+  (shared-internal by default); explicit parentRefs win, with missing
+  `namespace`/`sectionName` filled as `default`/`https`.
 
 ## Upgrading
 
@@ -1161,3 +1230,14 @@ metadata lookups; the ApplicationSet supplies them, apps write nothing.
 was replaced by the pinned `hotReload.ssh.knownHosts`.
 `previewDatabase.ttlSecondsAfterFinished` was removed so the create Job runs
 once per PR.
+
+### 0.8.0
+
+Routes attach to gateways via the `route.<id>.gateway` selector
+(shared-internal default) or explicit `parentRefs`; the chart fills
+`parentRefs` either way, so the base-values
+`route: {main: {enabled: false, parentRefs: [...]}}` boilerplate can be
+deleted — a route declared with only `hostnames` renders identically to the
+old explicit form. `dedicated-*` selectors render a per-app Gateway (own DO
+load balancer) with certificate and HTTP->HTTPS redirect; see
+[gateways](#k8s-app-gateways-gateway).

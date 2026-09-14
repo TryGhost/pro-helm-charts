@@ -26,5 +26,12 @@ global:
 
 {{- $_ := mergeOverwrite .Values (include "k8s-app.controllerDefaults.values" . | fromYaml) -}}
 
+{{- /* A dedicated Gateway is a DO load balancer per release: refuse it on
+per-PR preview releases before filling each route's parentRefs. */ -}}
+{{- if and .Values.preview.prNumber (ne (include "k8s-app.gateway.dedicatedNetworks" .) "[]") -}}
+  {{- fail "previews must use a shared gateway: a dedicated Gateway is a load balancer per release" -}}
+{{- end -}}
+{{- $_ := include "k8s-app.gateway.applyRouteDefaults" . -}}
+
 {{/* Render the templates */}}
 {{ include "bjw-s.common.loader.generate" . }}

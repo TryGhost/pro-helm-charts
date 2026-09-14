@@ -94,10 +94,6 @@ service:
       http:
         port: 3000
 
-route:
-  main:
-    enabled: false
-    parentRefs:
-      - name: shared-internal-gateway
-        namespace: default
-        sectionName: https
+# No route here: environments that expose the app declare it with hostnames;
+# the chart attaches it to the shared internal gateway unless the route
+# selects another with `gateway:` (see the chart README).

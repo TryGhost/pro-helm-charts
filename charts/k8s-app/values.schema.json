@@ -11107,6 +11107,16 @@
                 }
               }
             }
+          },
+          "gateway": {
+            "description": "Which gateway this route attaches to when parentRefs is not set: shared-internal (default), shared-external, dedicated-internal or dedicated-external. dedicated-* renders a per-app Gateway (its own DO load balancer) with certificate and HTTP->HTTPS redirect.",
+            "type": "string",
+            "enum": [
+              "shared-internal",
+              "shared-external",
+              "dedicated-internal",
+              "dedicated-external"
+            ]
           }
         }
       }
@@ -13449,6 +13459,105 @@
           "default": "TryGhost"
         }
       }
+    },
+    "gateway": {
+      "description": "Gateway attachment: platform facts and dedicated-gateway configuration. Routes select their gateway via route.<id>.gateway; this key selects nothing by itself.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "shared": {
+          "description": "The terraform-managed shared per-cluster Gateways.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "internal": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "default": "shared-internal-gateway",
+                  "description": "Name of the shared internal (VPC-only) Gateway."
+                },
+                "namespace": {
+                  "type": "string",
+                  "minLength": 1,
+                  "default": "default",
+                  "description": "Namespace it lives in."
+                }
+              },
+              "required": [
+                "name",
+                "namespace"
+              ],
+              "description": "The shared internal (VPC-only) Gateway."
+            },
+            "external": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "default": "shared-gateway",
+                  "description": "Name of the shared public Gateway."
+                },
+                "namespace": {
+                  "type": "string",
+                  "minLength": 1,
+                  "default": "default",
+                  "description": "Namespace it lives in."
+                }
+              },
+              "required": [
+                "name",
+                "namespace"
+              ],
+              "description": "The shared public Gateway."
+            }
+          },
+          "required": [
+            "internal",
+            "external"
+          ]
+        },
+        "dedicated": {
+          "description": "Configuration for dedicated (per-app) Gateways, rendered when a route selects dedicated-internal or dedicated-external. Each is its own DO load balancer.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "className": {
+              "type": "string",
+              "minLength": 1,
+              "default": "cilium",
+              "description": "GatewayClass for dedicated Gateways."
+            },
+            "issuer": {
+              "type": "string",
+              "minLength": 1,
+              "default": "letsencrypt-prod",
+              "description": "ClusterIssuer for each dedicated Gateway's per-host certificate."
+            },
+            "annotations": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "default": {},
+              "description": "Extra infrastructure annotations (DO load-balancer annotations)."
+            }
+          },
+          "required": [
+            "className",
+            "issuer"
+          ]
+        }
+      },
+      "required": [
+        "shared",
+        "dedicated"
+      ]
     }
   },
   "title": "k8s-app values",

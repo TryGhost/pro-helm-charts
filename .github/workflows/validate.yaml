@@ -61,6 +61,8 @@ jobs:
           ! helm template t "$CHART" $base --set controllers.main.bogus=1  # bjw-s schema still applies
           ! helm template t "$CHART" $base --set previewDatabase.bogus=1
           ! helm template t "$CHART" $base --set previewDatabase.backoffLimit=-1
+          ! helm template t "$CHART" $base --set route.main.gateway=bogus  # selector is an enum
+          ! helm template t "$CHART" $base --set gateway.bogus=1
 
       - name: Derived files are up to date (schema + rendered snapshots)
         # scripts/regen.sh rebuilds values.schema.json, the README values tables and tests/snapshots/;
@@ -105,6 +107,16 @@ jobs:
               | yq 'select(.kind=="Job" and .metadata.name=="myapp-create-preview-db") | .spec.template.spec.containers[0].env')
           [ "$(yq '.[] | select(.name=="DB_USER") | .valueFrom.secretKeyRef.name' <<<"$c")" = "other-db" ]
           [ "$(yq '.[] | select(.name=="DB_PASS") | .valueFrom.secretKeyRef.key' <<<"$c")" = "pw" ]
+          echo "route parentRefs are filled from the gateway selector (shared-internal default in the snapshots)"
+          [ "$(yq 'select(.kind=="HTTPRoute") | .spec.parentRefs[0].name' "$r/staging.yaml")" = "shared-internal-gateway" ]
+          echo "dedicated gateways render Gateway + Certificate + redirect, and are refused on previews"
+          d=$(helm template myapp "$CHART" -n myapp -f "$EX/values.base.yaml" -f "$EX/values.staging.yaml" --set route.main.gateway=dedicated-external)
+          yq 'select(.kind=="Gateway") | .metadata.name' <<<"$d" | grep -qx myapp-gateway-external
+          yq 'select(.kind=="Gateway") | .spec.infrastructure.annotations["service.beta.kubernetes.io/do-loadbalancer-network"]' <<<"$d" | grep -qx null
+          yq 'select(.kind=="Certificate") | .spec.dnsNames[0]' <<<"$d" | grep -qx myapp.ghostinfra.net
+          yq 'select(.kind=="HTTPRoute" and .metadata.name=="myapp-gateway-external-https-redirect") | .spec.rules[0].filters[0].type' <<<"$d" | grep -qx RequestRedirect
+          yq 'select(.kind=="HTTPRoute" and .metadata.name=="myapp") | .spec.parentRefs[0].name' <<<"$d" | grep -qx myapp-gateway-external
+          ! helm template myapp "$CHART" -n myapp -f "$EX/values.base.yaml" -f "$EX/values.preview.yaml" --set preview.prNumber=123 --set route.main.gateway=dedicated-internal
           echo "expected images come from chart defaults (Renovate bumps must not need assertion edits)"
           [ "$(yq 'select(.kind=="Deployment") | .spec.template.spec.containers[] | select(.name=="git-sync") | .image' "$r/preview.yaml")" = "$(yq '.hotReload.gitSync.image.repository + ":" + .hotReload.gitSync.image.tag' "$CHART/values.yaml")" ]
 

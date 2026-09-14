@@ -1,0 +1,36 @@
+{{- /*
+Catch-all HTTP->HTTPS redirect on each dedicated Gateway's port-80 listener,
+mirroring the cluster-addons https-redirect that covers the shared Gateways.
+A future hostname-specific route on the http listener would win over this
+catch-all (more-specific match), so port 80 stays usable if ever needed.
+group/kind and the catch-all match are API-server schema defaults; stated
+explicitly so ArgoCD does not see permanent drift against the live object.
+*/ -}}
+{{- $root := . -}}
+{{- range $net := include "k8s-app.gateway.dedicatedNetworks" . | fromJsonArray }}
+{{- $name := include "k8s-app.gateway.dedicatedName" (dict "rootContext" $root "network" $net) }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $name }}-https-redirect
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "k8s-app.labels" $root | nindent 4 }}
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ $name }}
+      sectionName: http
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301
+{{- end }}

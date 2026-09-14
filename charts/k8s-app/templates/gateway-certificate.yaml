@@ -1,0 +1,33 @@
+{{- /*
+Per-host certificate for each dedicated Gateway: the shared Gateways carry
+wildcard certs managed in cluster-addons, but a dedicated Gateway terminates
+TLS for exactly the hostnames of the routes attached to it. A dedicated
+network with no hostnamed route is a configuration error (nothing could ever
+be served), so the render fails loudly.
+*/ -}}
+{{- $root := . -}}
+{{- range $net := include "k8s-app.gateway.dedicatedNetworks" . | fromJsonArray }}
+{{- $name := include "k8s-app.gateway.dedicatedName" (dict "rootContext" $root "network" $net) }}
+{{- $hosts := include "k8s-app.gateway.dedicatedHostnames" (dict "rootContext" $root "network" $net) | fromJsonArray }}
+{{- if empty $hosts }}
+  {{- fail (printf "gateway: dedicated-%s is referenced but no enabled route attached to it declares hostnames (nothing to certify)" $net) }}
+{{- end }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $name }}-tls
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "k8s-app.labels" $root | nindent 4 }}
+spec:
+  secretName: {{ $name }}-tls
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: {{ $root.Values.gateway.dedicated.issuer }}
+  dnsNames:
+    {{- range $hosts }}
+    - {{ . | quote }}
+    {{- end }}
+{{- end }}

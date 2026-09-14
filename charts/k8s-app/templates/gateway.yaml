@@ -1,0 +1,50 @@
+{{- /*
+Dedicated Gateways: one per network referenced by an enabled route's
+`gateway: dedicated-<network>` selector. Each Gateway is its own DO load
+balancer (Cilium provisions a LoadBalancer Service per Gateway), so these
+are rendered only on demand and refused on PR previews (see common.yaml).
+allowedRoutes is same-namespace: a dedicated Gateway serves this app only.
+*/ -}}
+{{- $root := . -}}
+{{- range $net := include "k8s-app.gateway.dedicatedNetworks" . | fromJsonArray }}
+{{- $name := include "k8s-app.gateway.dedicatedName" (dict "rootContext" $root "network" $net) }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ $name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "k8s-app.labels" $root | nindent 4 }}
+spec:
+  gatewayClassName: {{ $root.Values.gateway.dedicated.className }}
+  infrastructure:
+    annotations:
+      # Stable LB name: renaming or deleting the Gateway recreates the load
+      # balancer with a new IP (DNS re-propagates via external-dns).
+      service.beta.kubernetes.io/do-loadbalancer-name: {{ $name }}
+      {{- if eq $net "internal" }}
+      service.beta.kubernetes.io/do-loadbalancer-network: INTERNAL
+      {{- end }}
+      {{- with $root.Values.gateway.dedicated.annotations }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: https
+      port: 443
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: {{ $name }}-tls
+      allowedRoutes:
+        namespaces:
+          from: Same
+{{- end }}

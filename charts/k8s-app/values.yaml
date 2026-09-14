@@ -152,3 +152,33 @@ previewDatabase:
   # + selfHeal it would re-run every time the TTL fired). It is deleted with
   # the Application; the drop hook is removed by its hook-delete-policy.
   resources: {}
+
+# -- Gateway attachment. This key holds platform facts and dedicated-gateway
+# configuration only — it selects nothing by itself. Each route picks its
+# gateway with `route.<id>.gateway`:
+#   shared-internal (default) | shared-external | dedicated-internal | dedicated-external
+# or states parentRefs explicitly (gaps filled: namespace `default`,
+# sectionName `https`). `dedicated-*` renders a per-app Gateway in the
+# release namespace — its own DO load balancer — plus a cert-manager
+# Certificate for the attached routes' hostnames and a catch-all HTTP->HTTPS
+# redirect. Dedicated gateways are refused on PR previews.
+gateway:
+  # -- The terraform-managed shared per-cluster Gateways.
+  shared:
+    internal:
+      # -- Name of the shared internal (VPC-only) Gateway.
+      name: shared-internal-gateway
+      # -- Namespace it lives in.
+      namespace: default
+    external:
+      # -- Name of the shared public Gateway.
+      name: shared-gateway
+      # -- Namespace it lives in.
+      namespace: default
+  dedicated:
+    # -- GatewayClass for dedicated Gateways.
+    className: cilium
+    # -- ClusterIssuer for each dedicated Gateway's per-host certificate.
+    issuer: letsencrypt-prod
+    # -- Extra infrastructure annotations (DO load-balancer annotations).
+    annotations: {}

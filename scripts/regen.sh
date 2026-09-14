@@ -23,7 +23,8 @@ tar -xzOf "$archive" common/values.schema.json \
       .["$id"] = "https://github.com/TryGhost/pro-helm-charts/blob/main/charts/k8s-app/values.schema.json"
       | .title = "k8s-app values"
       | .description = "bjw-s common library values (embedded verbatim from the locked common dependency) plus the options k8s-app adds: secretsInjection, hotReload and previewDatabase."
-      | .properties += $ext[0]' > "$CHART/values.schema.json"
+      | .properties.route.additionalProperties.properties += $ext[0]["x-route-extensions"]
+      | .properties += ($ext[0] | del(.["x-route-extensions"]))' > "$CHART/values.schema.json"
 
 # README values tables: regenerate every <!-- values: <prefixes> [exclude=<paths>] --> block
 md="$CHART/README.md" out="$md.tmp" skip=0
