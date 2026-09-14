@@ -1,17 +1,3 @@
----
-# Source: k8s-app/templates/common.yaml
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: myapp
-  labels:
-    app.kubernetes.io/instance: myapp
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: myapp
-  namespace: myapp
----
-# Source: k8s-app/templates/common.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -27,7 +13,6 @@ data:
   db__connection__charset: utf8mb4
   db__connection__database: myapp
 ---
-# Source: k8s-app/templates/common.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -40,30 +25,6 @@ metadata:
 data:
   known_hosts: github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
 ---
-# Source: k8s-app/templates/common.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: myapp
-  labels:
-    app.kubernetes.io/instance: myapp
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: myapp
-    app.kubernetes.io/service: myapp
-  namespace: myapp
-spec:
-  type: ClusterIP
-  ports:
-    - port: 3000
-      targetPort: 3000
-      protocol: TCP
-      name: http
-  selector:
-    app.kubernetes.io/controller: main
-    app.kubernetes.io/instance: myapp
-    app.kubernetes.io/name: myapp
----
-# Source: k8s-app/templates/common.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -86,44 +47,44 @@ spec:
       app.kubernetes.io/instance: myapp
   template:
     metadata:
-      annotations: 
+      annotations:
         checksum/configMaps: 6fc22be2a5093455f04b3c38dbafc95d901c325a7b7578942363dffb1185998b
-      labels: 
+      labels:
         app.kubernetes.io/controller: main
         app.kubernetes.io/instance: myapp
         app.kubernetes.io/name: myapp
         pull-request: __GITHUB_PR_NUMBER__
-    spec: 
+    spec:
       enableServiceLinks: false
       serviceAccountName: myapp
       automountServiceAccountToken: false
-      securityContext: 
+      securityContext:
         fsGroup: 65533
       hostIPC: false
       hostNetwork: false
       hostPID: false
       dnsPolicy: ClusterFirst
-      imagePullSecrets: 
+      imagePullSecrets:
         - name: ghost
-      initContainers: 
+      initContainers:
         - args:
-          - --ssh-key-file=/etc/git-secret/ssh
-          - --ssh-known-hosts=true
-          - --ssh-known-hosts-file=/etc/git-hosts/known_hosts
-          - --root=/workspace/git
-          - --link=app
-          - --depth=1
-          - --submodules=off
-          - --one-time
+            - --ssh-key-file=/etc/git-secret/ssh
+            - --ssh-known-hosts=true
+            - --ssh-known-hosts-file=/etc/git-hosts/known_hosts
+            - --root=/workspace/git
+            - --link=app
+            - --depth=1
+            - --submodules=off
+            - --one-time
           env:
-          - name: APP_NAME
-            value: myapp
-          - name: GITHUB_PR_NUMBER
-            value: __GITHUB_PR_NUMBER__
-          - name: GITSYNC_REF
-            value: refs/pull/__GITHUB_PR_NUMBER__/head
-          - name: GITSYNC_REPO
-            value: git@github.com:TryGhost/myapp.git
+            - name: APP_NAME
+              value: myapp
+            - name: GITHUB_PR_NUMBER
+              value: __GITHUB_PR_NUMBER__
+            - name: GITSYNC_REF
+              value: refs/pull/__GITHUB_PR_NUMBER__/head
+            - name: GITSYNC_REPO
+              value: git@github.com:TryGhost/myapp.git
           image: registry.k8s.io/git-sync/git-sync:v4.4.2
           name: git-sync-init
           resources:
@@ -136,80 +97,80 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop:
-              - ALL
+                - ALL
             runAsGroup: 65533
             runAsNonRoot: true
             runAsUser: 65533
           volumeMounts:
-          - mountPath: /etc/git-hosts
-            name: git-sync-hosts
-            readOnly: true
-          - mountPath: /etc/git-secret
-            name: git-sync-ssh
-            readOnly: true
-          - mountPath: /workspace
-            name: workspace
+            - mountPath: /etc/git-hosts
+              name: git-sync-hosts
+              readOnly: true
+            - mountPath: /etc/git-secret
+              name: git-sync-ssh
+              readOnly: true
+            - mountPath: /workspace
+              name: workspace
         - command:
-          - ./node_modules/.bin/knex
-          - migrate:latest
+            - ./node_modules/.bin/knex
+            - migrate:latest
           env:
-          - name: APP_NAME
-            value: myapp
-          - name: GITHUB_PR_NUMBER
-            value: __GITHUB_PR_NUMBER__
-          - name: db__connection__database
-            value: $(APP_NAME)_preview_$(GITHUB_PR_NUMBER)
-          - name: db__connection__host
-            valueFrom:
-              secretKeyRef:
-                key: host
-                name: app-db-secrets
-          - name: db__connection__password
-            valueFrom:
-              secretKeyRef:
-                key: password
-                name: app-db-secrets
-          - name: db__connection__port
-            valueFrom:
-              secretKeyRef:
-                key: port
-                name: app-db-secrets
-          - name: db__connection__ssl__ca
-            valueFrom:
-              secretKeyRef:
-                key: ssl_ca
-                name: app-db-secrets
-          - name: db__connection__user
-            valueFrom:
-              secretKeyRef:
-                key: user
-                name: app-db-secrets
+            - name: APP_NAME
+              value: myapp
+            - name: GITHUB_PR_NUMBER
+              value: __GITHUB_PR_NUMBER__
+            - name: db__connection__database
+              value: $(APP_NAME)_preview_$(GITHUB_PR_NUMBER)
+            - name: db__connection__host
+              valueFrom:
+                secretKeyRef:
+                  key: host
+                  name: app-db-secrets
+            - name: db__connection__password
+              valueFrom:
+                secretKeyRef:
+                  key: password
+                  name: app-db-secrets
+            - name: db__connection__port
+              valueFrom:
+                secretKeyRef:
+                  key: port
+                  name: app-db-secrets
+            - name: db__connection__ssl__ca
+              valueFrom:
+                secretKeyRef:
+                  key: ssl_ca
+                  name: app-db-secrets
+            - name: db__connection__user
+              valueFrom:
+                secretKeyRef:
+                  key: user
+                  name: app-db-secrets
           envFrom:
-          - configMapRef:
-              name: myapp-config
+            - configMapRef:
+                name: myapp-config
           image: registry.digitalocean.com/ghost/myapp:__IMAGE_SHA__
           name: migrate
-      containers: 
+      containers:
         - args:
-          - --ssh-key-file=/etc/git-secret/ssh
-          - --ssh-known-hosts=true
-          - --ssh-known-hosts-file=/etc/git-hosts/known_hosts
-          - --root=/workspace/git
-          - --link=app
-          - --depth=1
-          - --submodules=off
-          - --period=2s
-          - --max-failures=-1
-          - --stale-worktree-timeout=5m
+            - --ssh-key-file=/etc/git-secret/ssh
+            - --ssh-known-hosts=true
+            - --ssh-known-hosts-file=/etc/git-hosts/known_hosts
+            - --root=/workspace/git
+            - --link=app
+            - --depth=1
+            - --submodules=off
+            - --period=2s
+            - --max-failures=-1
+            - --stale-worktree-timeout=5m
           env:
-          - name: APP_NAME
-            value: myapp
-          - name: GITHUB_PR_NUMBER
-            value: __GITHUB_PR_NUMBER__
-          - name: GITSYNC_REF
-            value: refs/pull/__GITHUB_PR_NUMBER__/head
-          - name: GITSYNC_REPO
-            value: git@github.com:TryGhost/myapp.git
+            - name: APP_NAME
+              value: myapp
+            - name: GITHUB_PR_NUMBER
+              value: __GITHUB_PR_NUMBER__
+            - name: GITSYNC_REF
+              value: refs/pull/__GITHUB_PR_NUMBER__/head
+            - name: GITSYNC_REPO
+              value: git@github.com:TryGhost/myapp.git
           image: registry.k8s.io/git-sync/git-sync:v4.4.2
           name: git-sync
           resources:
@@ -222,64 +183,64 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop:
-              - ALL
+                - ALL
             runAsGroup: 65533
             runAsNonRoot: true
             runAsUser: 65533
           volumeMounts:
-          - mountPath: /etc/git-hosts
-            name: git-sync-hosts
-            readOnly: true
-          - mountPath: /etc/git-secret
-            name: git-sync-ssh
-            readOnly: true
-          - mountPath: /workspace
-            name: workspace
+            - mountPath: /etc/git-hosts
+              name: git-sync-hosts
+              readOnly: true
+            - mountPath: /etc/git-secret
+              name: git-sync-ssh
+              readOnly: true
+            - mountPath: /workspace
+              name: workspace
         - args:
-          - |
-            ln -sfn /app/node_modules /workspace/node_modules
-            exec pnpm dev --legacy-watch --watch /workspace/git/app --exec 'sh -c "cd /workspace/git/app && exec node src/main.js"'
+            - |
+              ln -sfn /app/node_modules /workspace/node_modules
+              exec pnpm dev --legacy-watch --watch /workspace/git/app --exec 'sh -c "cd /workspace/git/app && exec node src/main.js"'
           command:
-          - /sbin/tini
-          - -g
-          - --
-          - sh
-          - -ec
+            - /sbin/tini
+            - -g
+            - --
+            - sh
+            - -ec
           env:
-          - name: APP_NAME
-            value: myapp
-          - name: GITHUB_PR_NUMBER
-            value: __GITHUB_PR_NUMBER__
-          - name: db__connection__database
-            value: $(APP_NAME)_preview_$(GITHUB_PR_NUMBER)
-          - name: db__connection__host
-            valueFrom:
-              secretKeyRef:
-                key: host
-                name: app-db-secrets
-          - name: db__connection__password
-            valueFrom:
-              secretKeyRef:
-                key: password
-                name: app-db-secrets
-          - name: db__connection__port
-            valueFrom:
-              secretKeyRef:
-                key: port
-                name: app-db-secrets
-          - name: db__connection__ssl__ca
-            valueFrom:
-              secretKeyRef:
-                key: ssl_ca
-                name: app-db-secrets
-          - name: db__connection__user
-            valueFrom:
-              secretKeyRef:
-                key: user
-                name: app-db-secrets
+            - name: APP_NAME
+              value: myapp
+            - name: GITHUB_PR_NUMBER
+              value: __GITHUB_PR_NUMBER__
+            - name: db__connection__database
+              value: $(APP_NAME)_preview_$(GITHUB_PR_NUMBER)
+            - name: db__connection__host
+              valueFrom:
+                secretKeyRef:
+                  key: host
+                  name: app-db-secrets
+            - name: db__connection__password
+              valueFrom:
+                secretKeyRef:
+                  key: password
+                  name: app-db-secrets
+            - name: db__connection__port
+              valueFrom:
+                secretKeyRef:
+                  key: port
+                  name: app-db-secrets
+            - name: db__connection__ssl__ca
+              valueFrom:
+                secretKeyRef:
+                  key: ssl_ca
+                  name: app-db-secrets
+            - name: db__connection__user
+              valueFrom:
+                secretKeyRef:
+                  key: user
+                  name: app-db-secrets
           envFrom:
-          - configMapRef:
-              name: myapp-config
+            - configMapRef:
+                name: myapp-config
           image: registry.digitalocean.com/ghost/myapp:__IMAGE_SHA__
           livenessProbe:
             httpGet:
@@ -307,9 +268,9 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 2
           volumeMounts:
-          - mountPath: /workspace
-            name: workspace
-      volumes: 
+            - mountPath: /workspace
+              name: workspace
+      volumes:
         - configMap:
             name: myapp-git-sync-hosts
           name: git-sync-hosts
@@ -317,123 +278,12 @@ spec:
           secret:
             defaultMode: 288
             items:
-            - key: myapp-git-sync-ssh
-              path: ssh
+              - key: myapp-git-sync-ssh
+                path: ssh
             secretName: app-secrets
         - emptyDir: {}
           name: workspace
 ---
-# Source: k8s-app/templates/preview-db.yaml
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: myapp-create-preview-db
-  labels:
-    app.kubernetes.io/name: myapp
-    app.kubernetes.io/instance: myapp
-    app.kubernetes.io/managed-by: Helm
-  annotations:
-    argocd.argoproj.io/sync-options: "Force=true,Replace=true"
-    argocd.argoproj.io/sync-wave: "0"
-spec:
-  backoffLimit: 2
-  template:
-    spec:
-      restartPolicy: Never
-      containers:
-        - name: create
-          image: mysql:8.4
-          env:
-            - name: DB_USER
-              valueFrom:
-                secretKeyRef:
-                  name: app-db-secrets
-                  key: user
-            - name: DB_PASS
-              valueFrom:
-                secretKeyRef:
-                  name: app-db-secrets
-                  key: password
-            - name: DB_HOST
-              valueFrom:
-                secretKeyRef:
-                  name: app-db-secrets
-                  key: host
-            - name: DB_PORT
-              valueFrom:
-                secretKeyRef:
-                  name: app-db-secrets
-                  key: port
-            - name: APP_NAME
-              value: "myapp"
-            - name: GITHUB_PR_NUMBER
-              value: "__GITHUB_PR_NUMBER__"
-          command:
-            - sh
-            - -c
-            - |
-              set -eu
-              case "$GITHUB_PR_NUMBER" in '' | *[!0-9]*) echo "bad GITHUB_PR_NUMBER: $GITHUB_PR_NUMBER" >&2; exit 1;; esac
-              mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASS" \
-                -e "CREATE DATABASE IF NOT EXISTS \`${APP_NAME}_preview_${GITHUB_PR_NUMBER}\` CHARACTER SET utf8mb4"
-              echo "created ${APP_NAME}_preview_${GITHUB_PR_NUMBER}"
----
-# Source: k8s-app/templates/preview-db.yaml
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: myapp-drop-preview-db
-  labels:
-    app.kubernetes.io/name: myapp
-    app.kubernetes.io/instance: myapp
-    app.kubernetes.io/managed-by: Helm
-  annotations:
-    argocd.argoproj.io/hook: "PostDelete"
-    argocd.argoproj.io/hook-delete-policy: "HookSucceeded"
-spec:
-  backoffLimit: 2
-  template:
-    spec:
-      restartPolicy: Never
-      containers:
-        - name: drop
-          image: mysql:8.4
-          env:
-            - name: DB_USER
-              valueFrom:
-                secretKeyRef:
-                  name: app-db-secrets
-                  key: user
-            - name: DB_PASS
-              valueFrom:
-                secretKeyRef:
-                  name: app-db-secrets
-                  key: password
-            - name: DB_HOST
-              valueFrom:
-                secretKeyRef:
-                  name: app-db-secrets
-                  key: host
-            - name: DB_PORT
-              valueFrom:
-                secretKeyRef:
-                  name: app-db-secrets
-                  key: port
-            - name: APP_NAME
-              value: "myapp"
-            - name: GITHUB_PR_NUMBER
-              value: "__GITHUB_PR_NUMBER__"
-          command:
-            - sh
-            - -c
-            - |
-              set -eu
-              case "$GITHUB_PR_NUMBER" in '' | *[!0-9]*) echo "refusing to drop: bad GITHUB_PR_NUMBER '$GITHUB_PR_NUMBER'" >&2; exit 1;; esac
-              mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASS" \
-                -e "DROP DATABASE IF EXISTS \`${APP_NAME}_preview_${GITHUB_PR_NUMBER}\`"
-              echo "dropped ${APP_NAME}_preview_${GITHUB_PR_NUMBER}"
----
-# Source: k8s-app/templates/app-db-secrets.yaml
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -492,7 +342,6 @@ spec:
         # Cluster CA certificate (PEM); DO managed MySQL requires TLS.
         ssl_ca: '{{ (.db | fromJson).ssl_ca }}'
 ---
-# Source: k8s-app/templates/app-secrets.yaml
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -526,7 +375,6 @@ spec:
         tags:
           namespace: myapp
 ---
-# Source: k8s-app/templates/common.yaml
 apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: HTTPRoute
 metadata:
@@ -553,3 +401,144 @@ spec:
           namespace: myapp
           port: 3000
           weight: 1
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: myapp-create-preview-db
+  labels:
+    app.kubernetes.io/name: myapp
+    app.kubernetes.io/instance: myapp
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    argocd.argoproj.io/sync-options: "Force=true,Replace=true"
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: create
+          image: mysql:8.4
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: app-db-secrets
+                  key: user
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: app-db-secrets
+                  key: password
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: app-db-secrets
+                  key: host
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: app-db-secrets
+                  key: port
+            - name: APP_NAME
+              value: "myapp"
+            - name: GITHUB_PR_NUMBER
+              value: "__GITHUB_PR_NUMBER__"
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              case "$GITHUB_PR_NUMBER" in '' | *[!0-9]*) echo "bad GITHUB_PR_NUMBER: $GITHUB_PR_NUMBER" >&2; exit 1;; esac
+              mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASS" \
+                -e "CREATE DATABASE IF NOT EXISTS \`${APP_NAME}_preview_${GITHUB_PR_NUMBER}\` CHARACTER SET utf8mb4"
+              echo "created ${APP_NAME}_preview_${GITHUB_PR_NUMBER}"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: myapp-drop-preview-db
+  labels:
+    app.kubernetes.io/name: myapp
+    app.kubernetes.io/instance: myapp
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    argocd.argoproj.io/hook: "PostDelete"
+    argocd.argoproj.io/hook-delete-policy: "HookSucceeded"
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: drop
+          image: mysql:8.4
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: app-db-secrets
+                  key: user
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: app-db-secrets
+                  key: password
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: app-db-secrets
+                  key: host
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: app-db-secrets
+                  key: port
+            - name: APP_NAME
+              value: "myapp"
+            - name: GITHUB_PR_NUMBER
+              value: "__GITHUB_PR_NUMBER__"
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              case "$GITHUB_PR_NUMBER" in '' | *[!0-9]*) echo "refusing to drop: bad GITHUB_PR_NUMBER '$GITHUB_PR_NUMBER'" >&2; exit 1;; esac
+              mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USER" -p"$DB_PASS" \
+                -e "DROP DATABASE IF EXISTS \`${APP_NAME}_preview_${GITHUB_PR_NUMBER}\`"
+              echo "dropped ${APP_NAME}_preview_${GITHUB_PR_NUMBER}"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: myapp
+  labels:
+    app.kubernetes.io/instance: myapp
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: myapp
+    app.kubernetes.io/service: myapp
+  namespace: myapp
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/controller: main
+    app.kubernetes.io/instance: myapp
+    app.kubernetes.io/name: myapp
+---
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: myapp
+  labels:
+    app.kubernetes.io/instance: myapp
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: myapp
+  namespace: myapp

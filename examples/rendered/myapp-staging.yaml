@@ -1,17 +1,3 @@
----
-# Source: k8s-app/templates/common.yaml
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: myapp
-  labels:
-    app.kubernetes.io/instance: myapp
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: myapp
-  namespace: myapp
----
-# Source: k8s-app/templates/common.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -27,30 +13,6 @@ data:
   db__connection__charset: utf8mb4
   db__connection__database: myapp
 ---
-# Source: k8s-app/templates/common.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: myapp
-  labels:
-    app.kubernetes.io/instance: myapp
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: myapp
-    app.kubernetes.io/service: myapp
-  namespace: myapp
-spec:
-  type: ClusterIP
-  ports:
-    - port: 3000
-      targetPort: 3000
-      protocol: TCP
-      name: http
-  selector:
-    app.kubernetes.io/controller: main
-    app.kubernetes.io/instance: myapp
-    app.kubernetes.io/name: myapp
----
-# Source: k8s-app/templates/common.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -73,13 +35,13 @@ spec:
       app.kubernetes.io/instance: myapp
   template:
     metadata:
-      annotations: 
+      annotations:
         checksum/configMaps: 45f2c8441886c566d4ceec332dcaf9b789160ecf5a09251ff016f68cdc2b5316
-      labels: 
+      labels:
         app.kubernetes.io/controller: main
         app.kubernetes.io/instance: myapp
         app.kubernetes.io/name: myapp
-    spec: 
+    spec:
       enableServiceLinks: false
       serviceAccountName: myapp
       automountServiceAccountToken: false
@@ -87,84 +49,84 @@ spec:
       hostNetwork: false
       hostPID: false
       dnsPolicy: ClusterFirst
-      imagePullSecrets: 
+      imagePullSecrets:
         - name: ghost
-      initContainers: 
+      initContainers:
         - command:
-          - ./node_modules/.bin/knex
-          - migrate:latest
+            - ./node_modules/.bin/knex
+            - migrate:latest
           env:
-          - name: APP_NAME
-            value: myapp
-          - name: GITHUB_PR_NUMBER
-            value: ""
-          - name: db__connection__host
-            valueFrom:
-              secretKeyRef:
-                key: host
-                name: app-db-secrets
-          - name: db__connection__password
-            valueFrom:
-              secretKeyRef:
-                key: password
-                name: app-db-secrets
-          - name: db__connection__port
-            valueFrom:
-              secretKeyRef:
-                key: port
-                name: app-db-secrets
-          - name: db__connection__ssl__ca
-            valueFrom:
-              secretKeyRef:
-                key: ssl_ca
-                name: app-db-secrets
-          - name: db__connection__user
-            valueFrom:
-              secretKeyRef:
-                key: user
-                name: app-db-secrets
+            - name: APP_NAME
+              value: myapp
+            - name: GITHUB_PR_NUMBER
+              value: ""
+            - name: db__connection__host
+              valueFrom:
+                secretKeyRef:
+                  key: host
+                  name: app-db-secrets
+            - name: db__connection__password
+              valueFrom:
+                secretKeyRef:
+                  key: password
+                  name: app-db-secrets
+            - name: db__connection__port
+              valueFrom:
+                secretKeyRef:
+                  key: port
+                  name: app-db-secrets
+            - name: db__connection__ssl__ca
+              valueFrom:
+                secretKeyRef:
+                  key: ssl_ca
+                  name: app-db-secrets
+            - name: db__connection__user
+              valueFrom:
+                secretKeyRef:
+                  key: user
+                  name: app-db-secrets
           envFrom:
-          - configMapRef:
-              name: myapp
+            - configMapRef:
+                name: myapp
           image: registry.digitalocean.com/ghost/myapp:__IMAGE_SHA__
           name: migrate
-      containers: 
+      containers:
         - command:
-          - node
-          - src/main.js
+            - node
+            - src/main.js
           env:
-          - name: APP_NAME
-            value: myapp
-          - name: GITHUB_PR_NUMBER
-            value: ""
-          - name: db__connection__host
-            valueFrom:
-              secretKeyRef:
-                key: host
-                name: app-db-secrets
-          - name: db__connection__password
-            valueFrom:
-              secretKeyRef:
-                key: password
-                name: app-db-secrets
-          - name: db__connection__port
-            valueFrom:
-              secretKeyRef:
-                key: port
-                name: app-db-secrets
-          - name: db__connection__ssl__ca
-            valueFrom:
-              secretKeyRef:
-                key: ssl_ca
-                name: app-db-secrets
-          - name: db__connection__user
-            valueFrom:
-              secretKeyRef:
-                key: user
-                name: app-db-secrets
+            - name: APP_NAME
+              value: myapp
+            - name: GITHUB_PR_NUMBER
+              value: ""
+            - name: db__connection__host
+              valueFrom:
+                secretKeyRef:
+                  key: host
+                  name: app-db-secrets
+            - name: db__connection__password
+              valueFrom:
+                secretKeyRef:
+                  key: password
+                  name: app-db-secrets
+            - name: db__connection__port
+              valueFrom:
+                secretKeyRef:
+                  key: port
+                  name: app-db-secrets
+            - name: db__connection__ssl__ca
+              valueFrom:
+                secretKeyRef:
+                  key: ssl_ca
+                  name: app-db-secrets
+            - name: db__connection__user
+              valueFrom:
+                secretKeyRef:
+                  key: user
+                  name: app-db-secrets
           envFrom:
-          - configMapRef:
-              name: myapp
+            - configMapRef:
+                name: myapp
           image: registry.digitalocean.com/ghost/myapp:__IMAGE_SHA__
           livenessProbe:
             httpGet:
@@ -192,7 +154,6 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 2
 ---
-# Source: k8s-app/templates/app-db-secrets.yaml
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -251,7 +212,6 @@ spec:
         # Cluster CA certificate (PEM); DO managed MySQL requires TLS.
         ssl_ca: '{{ (.db | fromJson).ssl_ca }}'
 ---
-# Source: k8s-app/templates/app-secrets.yaml
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -285,7 +245,6 @@ spec:
         tags:
           namespace: myapp
 ---
-# Source: k8s-app/templates/common.yaml
 apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: HTTPRoute
 metadata:
@@ -312,3 +271,36 @@ spec:
           namespace: myapp
           port: 3000
           weight: 1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: myapp
+  labels:
+    app.kubernetes.io/instance: myapp
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: myapp
+    app.kubernetes.io/service: myapp
+  namespace: myapp
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/controller: main
+    app.kubernetes.io/instance: myapp
+    app.kubernetes.io/name: myapp
+---
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: myapp
+  labels:
+    app.kubernetes.io/instance: myapp
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: myapp
+  namespace: myapp

@@ -11,5 +11,7 @@ Apache License, Version 2.0:
     charts/other/app-template (version 5.1.0).
   - values.schema.json embeds the common library's values.schema.json and
     extends it with this chart's own options.
+  - README.md reproduces the option descriptions from that schema in its
+    values tables.
 
 The upstream LICENSE is included as LICENSE.upstream.

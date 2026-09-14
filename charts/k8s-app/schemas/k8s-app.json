@@ -17,7 +17,7 @@
       "refreshInterval": {
         "description": "ESO refresh interval for both ExternalSecrets.",
         "type": "string",
-        "pattern": "^[0-9]+(ns|us|\u00b5s|ms|s|m|h)$",
+        "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h)$",
         "default": "5m"
       },
       "store": {
@@ -27,7 +27,8 @@
           "name": {
             "type": "string",
             "minLength": 1,
-            "default": "gcp-secrets-manager"
+            "default": "gcp-secrets-manager",
+            "description": "Name of the (Cluster)SecretStore to read from."
           },
           "kind": {
             "type": "string",
@@ -35,13 +36,15 @@
               "ClusterSecretStore",
               "SecretStore"
             ],
-            "default": "ClusterSecretStore"
+            "default": "ClusterSecretStore",
+            "description": "Kind of the store: ClusterSecretStore or SecretStore."
           }
         },
         "required": [
           "name",
           "kind"
-        ]
+        ],
+        "description": "The (Cluster)SecretStore both ExternalSecrets read from."
       }
     },
     "required": [
@@ -57,27 +60,36 @@
     "properties": {
       "enabled": {
         "type": "boolean",
-        "default": false
+        "default": false,
+        "description": "Enable hot reload for this release (PR previews)."
       },
       "controller": {
         "type": "string",
         "minLength": 1,
-        "default": "main"
+        "default": "main",
+        "description": "Controller (under `controllers`) to add git-sync to."
       },
       "container": {
         "type": "string",
         "minLength": 1,
-        "default": "main"
+        "default": "main",
+        "description": "Container in that controller whose command/args are replaced."
       },
       "repo": {
-        "type": "string"
+        "type": "string",
+        "description": "Git repository to sync (SSH form, git-sync's GITSYNC_REPO), e.g. git@github.com:TryGhost/Daisy.js.git. Empty = preview.gitRepo, itself defaulting to git@github.com:<preview.owner>/<release namespace>.git.",
+        "default": ""
       },
       "ref": {
-        "type": "string"
+        "type": "string",
+        "description": "Git ref to follow (git-sync's GITSYNC_REF). Empty = derived at render time as refs/pull/<preview.prNumber>/head. Set explicitly (e.g. a branch) to override.",
+        "default": ""
       },
       "workspace": {
         "type": "string",
-        "pattern": "^/"
+        "pattern": "^/",
+        "description": "emptyDir mount path shared by git-sync and the app container.",
+        "default": "/workspace"
       },
       "gitSync": {
         "type": "object",
@@ -89,56 +101,77 @@
             "properties": {
               "repository": {
                 "type": "string",
-                "minLength": 1
+                "minLength": 1,
+                "default": "registry.k8s.io/git-sync/git-sync"
               },
               "tag": {
                 "type": "string",
-                "minLength": 1
+                "minLength": 1,
+                "default": "v4.4.2"
               }
             },
             "required": [
               "repository",
               "tag"
-            ]
+            ],
+            "description": "git-sync image (repository + tag)."
           },
           "period": {
             "type": "string",
-            "pattern": "^[0-9]+(ms|s|m|h)$"
+            "pattern": "^[0-9]+(ms|s|m|h)$",
+            "description": "Polling interval for the sidecar.",
+            "default": "2s"
           },
           "staleWorktreeTimeout": {
             "type": "string",
-            "pattern": "^[0-9]+(ms|s|m|h)$"
+            "pattern": "^[0-9]+(ms|s|m|h)$",
+            "description": "How long old worktrees are kept so the watcher can stop the old process.",
+            "default": "5m"
           },
           "depth": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "default": 1,
+            "description": "Clone depth (git-sync --depth)."
           },
           "root": {
             "type": "string",
-            "pattern": "^/"
+            "pattern": "^/",
+            "description": "git-sync --root; the checkout is published at <root>/<link>.",
+            "default": "/workspace/git"
           },
           "link": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "default": "app",
+            "description": "Symlink name under root that git-sync publishes atomically (--link)."
           },
           "uid": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "description": "git-sync runs as this uid/gid; the pod's fsGroup is set to gid so the mounted SSH key is readable.",
+            "default": 65533
           },
           "gid": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "default": 65533,
+            "description": "gid git-sync runs as; also the pod fsGroup so the mounted SSH key is readable."
           },
           "extraArgs": {
             "type": "array",
             "items": {
               "type": "string"
-            }
+            },
+            "description": "Extra args appended to both git-sync containers.",
+            "default": []
           },
           "resources": {
-            "type": "object"
+            "type": "object",
+            "description": "Resources for both git-sync containers."
           }
-        }
+        },
+        "description": "git-sync sidecar / init container settings."
       },
       "ssh": {
         "type": "object",
@@ -146,16 +179,23 @@
         "properties": {
           "secretName": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "description": "Secret holding the read-only deploy key (by convention the app-secrets Secret created by secretsInjection).",
+            "default": "app-secrets"
           },
           "key": {
-            "type": "string"
+            "type": "string",
+            "description": "Key inside that Secret. Defaults to \"<namespace>-git-sync-ssh\" (namespace == app name by convention), matching the Terraform argocd module: per-PR preview releases are named <app>-<pr>, but the deploy key is provisioned per app, not per release.",
+            "default": ""
           },
           "knownHosts": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "description": "Pinned SSH host key(s) for the git host, rendered into a ConfigMap mounted at /etc/git-hosts/known_hosts (host-key verification on). No runtime lookups: pods boot without network calls to GitHub's API. https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints",
+            "default": "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl\n"
           }
-        }
+        },
+        "description": "SSH deploy key and host key settings."
       },
       "app": {
         "type": "object",
@@ -165,27 +205,37 @@
             "type": "array",
             "items": {
               "type": "string"
-            }
+            },
+            "description": "Entrypoint for the app container while hot reloading. The default runs the generated args script under tini."
           },
           "args": {
             "type": "array",
             "items": {
               "type": "string"
-            }
+            },
+            "description": "Args for the app container. Empty = generated script: ln -sfn <nodeModules> <workspace>/node_modules exec <devCommand> --legacy-watch --watch <checkout> --exec 'sh -c \"cd <checkout> && exec <run>\"' Set a non-empty list to take full control (command is used verbatim).",
+            "default": []
           },
           "devCommand": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "description": "Dev runner in the image (e.g. `pnpm dev` running nodemon).",
+            "default": "pnpm dev"
           },
           "run": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "description": "Command the runner (re)starts inside the synced checkout.",
+            "default": "node src/main.js"
           },
           "nodeModules": {
             "type": "string",
-            "pattern": "^/"
+            "pattern": "^/",
+            "description": "Dependencies directory baked into the image, symlinked into the workspace.",
+            "default": "/app/node_modules"
           }
-        }
+        },
+        "description": "How the app container runs while hot reloading."
       }
     }
   },
@@ -196,7 +246,8 @@
     "properties": {
       "enabled": {
         "type": "boolean",
-        "default": false
+        "default": false,
+        "description": "Create the per-PR database Jobs."
       },
       "image": {
         "type": "object",
@@ -204,21 +255,26 @@
         "properties": {
           "repository": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "default": "mysql"
           },
           "tag": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "default": "8.4"
           }
         },
         "required": [
           "repository",
           "tag"
-        ]
+        ],
+        "description": "MySQL client image used by both Jobs."
       },
       "secretName": {
         "type": "string",
-        "minLength": 1
+        "minLength": 1,
+        "description": "Secret holding the MySQL connection details (pairs with secretsInjection.database, which creates app-db-secrets).",
+        "default": "app-db-secrets"
       },
       "keys": {
         "type": "object",
@@ -226,33 +282,42 @@
         "properties": {
           "host": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "default": "host"
           },
           "port": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "default": "port"
           },
           "user": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "default": "user"
           },
           "password": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "default": "password"
           }
-        }
+        },
+        "description": "Keys inside secretName holding host, port, user and password."
       },
       "backoffLimit": {
         "type": "integer",
-        "minimum": 0
+        "minimum": 0,
+        "description": "Job retries before giving up.",
+        "default": 2
       },
       "resources": {
-        "type": "object"
+        "type": "object",
+        "default": {},
+        "description": "Resources for the Job containers."
       }
     }
   },
   "preview": {
-    "description": "Per-render preview facts, set by gitops-sync when snapshotting a PR preview. Empty outside previews.",
+    "description": "Per-render preview facts. Set by the pull-request ApplicationSet as Helm parameters; apps never write them. Empty outside previews.",
     "type": "object",
     "additionalProperties": false,
     "properties": {
@@ -261,15 +326,18 @@
         "type": [
           "string",
           "integer"
-        ]
+        ],
+        "default": ""
       },
       "gitRepo": {
-        "description": "SSH clone URL for hotReload; empty = derived from owner + release namespace.",
-        "type": "string"
+        "description": "SSH clone URL for hotReload. Empty = git@github.com:<owner>/<release namespace>.git.",
+        "type": "string",
+        "default": ""
       },
       "owner": {
         "description": "GitHub owner used when deriving gitRepo.",
-        "type": "string"
+        "type": "string",
+        "default": "TryGhost"
       }
     }
   }

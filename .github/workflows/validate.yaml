@@ -61,13 +61,13 @@ jobs:
           ! helm template t "$CHART" -f examples/minimal.yaml --set previewDatabase.backoffLimit=-1
 
       - name: Derived files are up to date (schema + rendered snapshots)
-        # scripts/regen.sh rebuilds values.schema.json and examples/rendered/;
+        # scripts/regen.sh rebuilds values.schema.json, the README values tables and examples/rendered/;
         # a chart change must commit its regenerated output. The snapshot diff
         # in a PR is the exact manifest change every app will see.
         run: |
           ./scripts/regen.sh
           git add -N examples/rendered   # so new snapshot files show up in the diff too
-          if ! git diff --exit-code --stat -- "$CHART/values.schema.json" examples/rendered; then
+          if ! git diff --exit-code --stat -- "$CHART/values.schema.json" "$CHART/README.md" examples/rendered; then
             echo "::error::Derived files are stale. Run scripts/regen.sh and commit the result." >&2
             exit 1
           fi
