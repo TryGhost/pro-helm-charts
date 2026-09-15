@@ -60,7 +60,7 @@ version: 0.0.0
 dependencies:
   - name: k8s-app
     repository: https://tryghost.github.io/pro-helm-charts
-    version: 0.8.0
+    version: 0.8.1
 ```
 
 ```yaml
@@ -84,7 +84,7 @@ Outside gitops, the chart installs like any other:
 
 ```sh
 helm repo add ghost https://tryghost.github.io/pro-helm-charts
-helm install myapp ghost/k8s-app --version 0.8.0 -n myapp -f values.yaml
+helm install myapp ghost/k8s-app --version 0.8.1 -n myapp -f values.yaml
 ```
 
 Every release bundles its `common` dependency, so consumers never add the
@@ -522,10 +522,12 @@ that expose the app:
 # values.staging.yaml
 route:
   main:
-    enabled: true
     hostnames: [myapp.ghostinfra.net]
     # gateway: shared-internal   (the default; see the gateways section)
 ```
+
+A declared route is enabled by default; `enabled: false` switches one off
+without deleting the block.
 
 Explicit `parentRefs` remain the escape hatch and win over the selector
 (missing `namespace`/`sectionName` are filled with the shared-Gateway
@@ -1143,11 +1145,9 @@ where it asked.
 ```yaml
 route:
   api:
-    enabled: true
     hostnames: [api.ghostinfra.com]
     gateway: shared-external
   partner:
-    enabled: true
     hostnames: [partner.ghostinfra.com]
     gateway: dedicated-external
 ```

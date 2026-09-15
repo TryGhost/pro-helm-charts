@@ -17,6 +17,5 @@ controllers:
 
 route:
   main:
-    enabled: true
     hostnames:
       - myapp.ghostinfra.com

@@ -28,6 +28,5 @@ controllers:
 
 route:
   main:
-    enabled: true
     hostnames:
       - myapp-__GITHUB_PR_NUMBER__.ghostinfra.net

@@ -21,7 +21,7 @@ version: 0.0.0
 dependencies:
   - name: k8s-app
     repository: https://tryghost.github.io/pro-helm-charts
-    version: 0.8.0
+    version: 0.8.1
 ```
 
 ```sh
