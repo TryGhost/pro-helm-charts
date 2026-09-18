@@ -17,6 +17,13 @@ global:
 {{- end -}}
 {{- $_ := mergeOverwrite .Values (include "k8s-app.hardcodedValues" . | fromYaml) -}}
 
+{{- /* The app-db-secrets Secret comes with the env that reads it. Before
+hotReload, so the app's own containers get the credentials and the git-sync
+containers it adds do not. */ -}}
+{{- if and .Values.secretsInjection.enabled .Values.secretsInjection.database }}
+{{- $_ := mergeOverwrite .Values (include "k8s-app.databaseEnv.values" . | fromYaml) -}}
+{{- end }}
+
 {{- if .Values.hotReload.enabled }}
 {{- $_ := mergeOverwrite .Values (include "k8s-app.hotReload.values" . | fromYaml) -}}
 {{- end }}

@@ -93,6 +93,17 @@ jobs:
           [ "$(yq 'select(.kind=="Deployment") | .spec.template.spec.containers[0].envFrom[] | select(.secretRef != null) | .secretRef.name' "$r/staging.yaml")" = "" ]
           echo "hot reload leaves the app container's env alone and touches only its command/args"
           [ "$(yq 'select(.kind=="Deployment") | .spec.template.spec.containers[] | select(.name=="main") | .env[] | select(.name=="db__connection__database") | .value' "$r/preview.yaml")" = '$(APP_NAME)_preview_$(GITHUB_PR_NUMBER)' ]
+          echo "the connection env comes with app-db-secrets and goes when it does"
+          m=$(helm template myapp "$CHART" -n myapp -f "$EX/values.base.yaml" -f "$EX/values.staging.yaml" \
+              | yq 'select(.kind=="Deployment") | .spec.template.spec.containers[] | select(.name=="main") | .env')
+          [ "$(yq '.[] | select(.name=="db__connection__host") | .valueFrom.secretKeyRef.key' <<<"$m")" = "host" ]
+          [ "$(yq '.[] | select(.name=="db__client") | .value' <<<"$m")" = "mysql2" ]
+          [ "$(yq '.[] | select(.name=="db__connection__database") | .value' <<<"$m")" = "myapp" ]
+          ! helm template t "$CHART" -f "$EX/values.base.yaml" -f "$EX/values.staging.yaml" --set secretsInjection.database=false | grep -q 'db__connection__host'
+          echo "the credentials never reach the git-sync containers"
+          for c in git-sync git-sync-init; do
+            [ "$(yq "select(.kind==\"Deployment\") | [.spec.template.spec.containers[], .spec.template.spec.initContainers[]] | .[] | select(.name==\"$c\") | .env[].name | select(test(\"__connection__\"))" "$r/preview.yaml")" = "" ]
+          done
           echo "the SSH deploy key is mounted only into git-sync containers"
           [ "$(yq 'select(.kind=="Deployment") | .spec.template.spec.containers[] | select(.name=="main") | .volumeMounts[] | select(.name=="git-sync-ssh") | .name' "$r/preview.yaml")" = "" ]
           echo "explicit hotReload.repo / .ref override the derived values"

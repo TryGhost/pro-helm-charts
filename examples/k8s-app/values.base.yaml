@@ -4,12 +4,13 @@ secretsInjection:
   enabled: true
   database: true
 
+# secretsInjection.database also fills db__connection__host and friends from
+# the app-db-secrets Secret, so the ConfigMap below only carries the app's own
+# settings (each environment adds NODE_ENV).
 configMaps:
   config:
     data:
-      db__client: mysql2
-      db__connection__charset: utf8mb4
-      db__connection__database: myapp
+      LOG_LEVEL: info
 
 controllers:
   main:
@@ -25,32 +26,6 @@ controllers:
         envFrom: &envFrom
           - configMapRef:
               identifier: config
-        env: &env
-          db__connection__host:
-            valueFrom:
-              secretKeyRef:
-                name: app-db-secrets
-                key: host
-          db__connection__port:
-            valueFrom:
-              secretKeyRef:
-                name: app-db-secrets
-                key: port
-          db__connection__user:
-            valueFrom:
-              secretKeyRef:
-                name: app-db-secrets
-                key: user
-          db__connection__password:
-            valueFrom:
-              secretKeyRef:
-                name: app-db-secrets
-                key: password
-          db__connection__ssl__ca:
-            valueFrom:
-              secretKeyRef:
-                name: app-db-secrets
-                key: ssl_ca
         probes:
           startup:
             enabled: true
@@ -85,7 +60,6 @@ controllers:
           - ./node_modules/.bin/knex
           - migrate:latest
         envFrom: *envFrom
-        env: *env
 
 service:
   main:
