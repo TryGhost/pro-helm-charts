@@ -4,6 +4,14 @@ secretsInjection:
   enabled: true
   database: true
 
+# Runs in the app's own image, at sync-wave -1: after the (preview) database
+# exists and before the Deployment rolls.
+migrations:
+  enabled: true
+  command:
+    - ./node_modules/.bin/knex
+    - migrate:latest
+
 # secretsInjection.database also fills db__connection__host and friends from
 # the app-db-secrets Secret, so the ConfigMap below only carries the app's own
 # settings (each environment adds NODE_ENV).
@@ -17,13 +25,13 @@ controllers:
     containers:
       main:
         # __IMAGE_SHA__ is filled by gitops-sync when snapshotting to k8s gitops repo
-        image: &image
+        image:
           repository: registry.digitalocean.com/ghost/myapp
           tag: __IMAGE_SHA__
         command:
           - node
           - src/main.js
-        envFrom: &envFrom
+        envFrom:
           - configMapRef:
               identifier: config
         probes:
@@ -53,13 +61,6 @@ controllers:
                 path: /readyz
                 port: 3000
               periodSeconds: 15
-    initContainers:
-      migrate:
-        image: *image
-        command:
-          - ./node_modules/.bin/knex
-          - migrate:latest
-        envFrom: *envFrom
 
 service:
   main:

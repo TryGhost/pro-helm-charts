@@ -63,6 +63,10 @@ jobs:
           ! helm template t "$CHART" $base --set previewDatabase.backoffLimit=-1
           ! helm template t "$CHART" $base --set route.main.gateway=bogus  # selector is an enum
           ! helm template t "$CHART" $base --set gateway.bogus=1
+          ! helm template t "$CHART" $base --set migrations.bogus=1
+          ! helm template t "$CHART" $base --set migrations.backoffLimit=-1
+          ! helm template t "$CHART" $base --set migrations.enabled=true --set migrations.command=null   # command is required
+          ! helm template t "$CHART" $base --set migrations.container=nope   # unknown container
 
       - name: Derived files are up to date (schema + rendered snapshots)
         # scripts/regen.sh rebuilds values.schema.json, the README values tables and tests/snapshots/;
@@ -100,6 +104,23 @@ jobs:
           [ "$(yq '.[] | select(.name=="db__client") | .value' <<<"$m")" = "mysql2" ]
           [ "$(yq '.[] | select(.name=="db__connection__database") | .value' <<<"$m")" = "myapp" ]
           ! helm template t "$CHART" -f "$EX/values.base.yaml" -f "$EX/values.staging.yaml" --set secretsInjection.database=false | grep -q 'db__connection__host'
+          echo "the migrations Job is the app's container with command replaced, ordered before the workloads"
+          j=$(yq 'select(.kind=="Job" and .metadata.name=="myapp-migrations")' "$r/preview.yaml")
+          d=$(yq 'select(.kind=="Deployment") | .spec.template.spec.containers[] | select(.name=="main")' "$r/preview.yaml")
+          [ "$(yq '.spec.template.spec.containers[0].image' <<<"$j")" = "$(yq '.image' <<<"$d")" ]
+          [ "$(yq '.spec.template.spec.containers[0].envFrom' <<<"$j")" = "$(yq '.envFrom' <<<"$d")" ]
+          [ "$(yq '.spec.template.spec.containers[0].env[] | select(.name=="db__connection__database") | .value' <<<"$j")" = '$(APP_NAME)_preview_$(GITHUB_PR_NUMBER)' ]
+          [ "$(yq '.spec.template.spec.containers[0].probes // "none"' <<<"$j")" = "none" ]
+          [ "$(yq '.spec.template.spec.restartPolicy' <<<"$j")" = "Never" ]
+          [ "$(yq '.metadata.annotations["argocd.argoproj.io/sync-options"]' <<<"$j")" = "Force=true,Replace=true" ]
+          echo "the Job does not rename the app's own workload"
+          [ "$(yq 'select(.kind=="Deployment") | .metadata.name' "$r/staging.yaml")" = "myapp" ]
+          [ "$(yq 'select(.kind=="Deployment") | .metadata.name' "$r/preview.yaml")" = "myapp" ]
+          echo "sync waves order the release: secrets -10, preview database -2, migrations -1, workloads 0"
+          [ "$(yq -r 'select(.kind=="ExternalSecret") | .metadata.annotations["argocd.argoproj.io/sync-wave"]' "$r/preview.yaml" | grep -v '^---$' | sort -u)" = "-10" ]
+          [ "$(yq 'select(.kind=="Job" and .metadata.name=="myapp-create-preview-db") | .metadata.annotations["argocd.argoproj.io/sync-wave"]' "$r/preview.yaml")" = "-2" ]
+          [ "$(yq 'select(.kind=="Job" and .metadata.name=="myapp-migrations") | .metadata.annotations["argocd.argoproj.io/sync-wave"]' "$r/preview.yaml")" = "-1" ]
+          [ "$(yq 'select(.kind=="Deployment") | .metadata.annotations["argocd.argoproj.io/sync-wave"] // "unset"' "$r/preview.yaml")" = "unset" ]
           echo "the credentials never reach the git-sync containers"
           for c in git-sync git-sync-init; do
             [ "$(yq "select(.kind==\"Deployment\") | [.spec.template.spec.containers[], .spec.template.spec.initContainers[]] | .[] | select(.name==\"$c\") | .env[].name | select(test(\"__connection__\"))" "$r/preview.yaml")" = "" ]
