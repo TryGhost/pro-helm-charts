@@ -60,7 +60,7 @@ version: 0.0.0
 dependencies:
   - name: k8s-app
     repository: https://tryghost.github.io/pro-helm-charts
-    version: 0.8.1
+    version: 0.9.0
 ```
 
 ```yaml
@@ -84,7 +84,7 @@ Outside gitops, the chart installs like any other:
 
 ```sh
 helm repo add ghost https://tryghost.github.io/pro-helm-charts
-helm install myapp ghost/k8s-app --version 0.8.1 -n myapp -f values.yaml
+helm install myapp ghost/k8s-app --version 0.9.0 -n myapp -f values.yaml
 ```
 
 Every release bundles its `common` dependency, so consumers never add the
@@ -942,8 +942,8 @@ sync-wave `-1` so the Secrets exist before workloads start, and are marked
 bootstrap them, later releases co-manage them, and nothing in a preview's
 lifecycle removes them.
 
-Creating the Secrets injects nothing. Map the keys explicitly with `env`,
-`envFrom` or a `persistence` item, exactly as for any other Secret:
+`app-secrets` is created, not injected: map its keys explicitly with `env`,
+`envFrom` or a `persistence` item, exactly as for any other Secret.
 
 ```yaml
 secretsInjection:
@@ -954,10 +954,42 @@ controllers:
     containers:
       main:
         env:
-          db__connection__host:
+          some_api__key:
             valueFrom:
-              secretKeyRef: {name: app-db-secrets, key: host}
+              secretKeyRef: {name: app-secrets, key: some-api-key}
 ```
+
+`app-db-secrets` is the exception. The apps read their configuration with
+nconf, whose env provider maps `a__b__c` to `a.b.c`, so the MySQL connection
+is the same handful of variables in every app — written out once in the
+values and again in the migration initContainer. `database: true` fills them
+in instead, in every container and initContainer of every controller:
+
+| Env var | Value |
+|---|---|
+| `db__client` | `mysql2` |
+| `db__connection__charset` | `utf8mb4` |
+| `db__connection__database` | the release namespace (namespace == app name) |
+| `db__connection__host` | `app-db-secrets` key `host` (the VPC hostname) |
+| `db__connection__port` | `app-db-secrets` key `port` |
+| `db__connection__user` | `app-db-secrets` key `user` |
+| `db__connection__password` | `app-db-secrets` key `password` |
+| `db__connection__ssl__ca` | `app-db-secrets` key `ssl_ca` |
+
+There is nothing to configure: an app that wants something else declares that
+env itself and wins, which is how a preview points at its per-PR database.
+
+```yaml
+controllers:
+  main:
+    containers:
+      main:
+        env:
+          db__connection__database: $(APP_NAME)_preview_$(GITHUB_PR_NUMBER)
+```
+
+The fill happens before `hotReload`, so the credentials reach the app's own
+containers and never the git-sync sidecars.
 
 Assumes External Secrets Operator and the ClusterSecretStore exist in the
 cluster. Example: [`examples/k8s-app/values.base.yaml`](../../examples/k8s-app/values.base.yaml);
@@ -967,7 +999,7 @@ the rendered ExternalSecrets are in [`tests/snapshots/staging.yaml`](tests/snaps
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `secretsInjection` | object |  | External Secrets injection (app-secrets / app-db-secrets ExternalSecrets). Requires External Secrets Operator and the referenced store to exist. |
-| `secretsInjection.database` | boolean | `false` | Also create the app-db-secrets ExternalSecret (only when enabled is true). |
+| `secretsInjection.database` | boolean | `false` | Also create the app-db-secrets ExternalSecret and inject the nconf connection env that reads it (db__client, db__connection__charset/database/host/port/user/password/ssl__ca) into every container and initContainer. App-declared env wins. Only when enabled is true. |
 | `secretsInjection.enabled` | boolean | `false` | Master switch: create the app-secrets ExternalSecret. |
 | `secretsInjection.refreshInterval` | string | `"5m"` | ESO refresh interval for both ExternalSecrets. |
 | `secretsInjection.store` | object |  | The (Cluster)SecretStore both ExternalSecrets read from. |
@@ -1241,3 +1273,14 @@ deleted — a route declared with only `hostnames` renders identically to the
 old explicit form. `dedicated-*` selectors render a per-app Gateway (own DO
 load balancer) with certificate and HTTP->HTTPS redirect; see
 [gateways](#k8s-app-gateways-gateway).
+
+### 0.9.0
+
+`secretsInjection.database: true` now also fills the nconf MySQL connection
+env, so the `db__client` / `db__connection__charset` /
+`db__connection__database` entries in the ConfigMap and the five
+`secretKeyRef` env entries (plus their copy in the migration initContainer)
+can be deleted from app values. Keep any env the app overrides, such as a
+preview's `db__connection__database`; anything an app still declares itself
+wins over the injected value, so apps upgrade without touching their values
+first.

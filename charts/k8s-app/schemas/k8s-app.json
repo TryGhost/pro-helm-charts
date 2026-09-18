@@ -10,7 +10,7 @@
         "default": false
       },
       "database": {
-        "description": "Also create the app-db-secrets ExternalSecret (only when enabled is true).",
+        "description": "Also create the app-db-secrets ExternalSecret and inject the nconf connection env that reads it (db__client, db__connection__charset/database/host/port/user/password/ssl__ca) into every container and initContainer. App-declared env wins. Only when enabled is true.",
         "type": "boolean",
         "default": false
       },

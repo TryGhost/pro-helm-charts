@@ -8,10 +8,8 @@ metadata:
     app.kubernetes.io/name: myapp
   namespace: myapp
 data:
+  LOG_LEVEL: info
   NODE_ENV: production
-  db__client: mysql2
-  db__connection__charset: utf8mb4
-  db__connection__database: myapp
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -36,7 +34,7 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/configMaps: 39545143d7662e92571701c1b04ee59006e58aca76c93818e6b84b6e24b2b5a6
+        checksum/configMaps: 0e4b05b25c30a3bef599580d4b2cfc8c933176c7a052e90c0c5c654b3b3e3216
       labels:
         app.kubernetes.io/controller: main
         app.kubernetes.io/instance: myapp
@@ -60,6 +58,12 @@ spec:
               value: myapp
             - name: GITHUB_PR_NUMBER
               value: ""
+            - name: db__client
+              value: mysql2
+            - name: db__connection__charset
+              value: utf8mb4
+            - name: db__connection__database
+              value: myapp
             - name: db__connection__host
               valueFrom:
                 secretKeyRef:
@@ -99,6 +103,12 @@ spec:
               value: myapp
             - name: GITHUB_PR_NUMBER
               value: ""
+            - name: db__client
+              value: mysql2
+            - name: db__connection__charset
+              value: utf8mb4
+            - name: db__connection__database
+              value: myapp
             - name: db__connection__host
               valueFrom:
                 secretKeyRef:

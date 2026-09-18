@@ -30,15 +30,21 @@ preview:
 # -- External Secrets injection: the app-secrets / app-db-secrets
 # ExternalSecrets for the release namespace. Assumes External Secrets
 # Operator and the referenced ClusterSecretStore already exist in the
-# cluster. Creating these resources does not mount or inject anything into
-# containers: map keys explicitly with env/envFrom/persistence as before.
+# cluster. app-secrets is not mounted or injected anywhere: map its keys
+# explicitly with env/envFrom/persistence. app-db-secrets is the exception —
+# see `database` below.
 secretsInjection:
   # -- Master switch. Creates the `app-secrets` ExternalSecret -> Secret
   # (every GCP secret labeled namespace=<release namespace>, one key each).
   enabled: false
   # -- Additionally create the `app-db-secrets` ExternalSecret -> Secret
   # (Terraform's <env>-<app>db JSON secret exploded into host, port, user,
-  # password, database, uri, ssl_ca, ...). Only takes effect with enabled: true.
+  # password, database, uri, ssl_ca, ...) and fill the nconf connection env
+  # that reads it — db__client, db__connection__charset, __database (the
+  # release namespace), __host, __port, __user, __password and __ssl__ca —
+  # in every container and initContainer. App-declared env wins, which is how
+  # a preview points itself at its per-PR database. Only takes effect with
+  # enabled: true.
   database: false
   # -- How often ESO re-reads the backend.
   refreshInterval: 5m
