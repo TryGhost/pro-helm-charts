@@ -41,19 +41,9 @@ in sync.
     {{- $_ := set $container $key . -}}
   {{- end -}}
 {{- end -}}
-{{- /* The library names a controller's resource <release> while it is the only
-enabled one and <release>-<identifier> once there are several. Adding this Job
-would therefore rename the app's Deployment out from under a running release;
-forceRename (the only escape from that rule) keeps the name it already has,
-unless the app names it itself. */ -}}
-{{- $enabled := list -}}
-{{- range $name, $c := (.Values.controllers | default dict) -}}
-  {{- if (dig "enabled" true ($c | default dict)) -}}{{- $enabled = append $enabled $name -}}{{- end -}}
-{{- end -}}
-{{- $out := dict -}}
-{{- if and (eq (len $enabled) 1) (not (or (hasKey $ctrl "forceRename") (hasKey $ctrl "prefix") (hasKey $ctrl "suffix"))) -}}
-  {{- $_ := set $out (first $enabled) (dict "forceRename" .Release.Name) -}}
-{{- end -}}
+{{- /* Adding this Job would rename the app's Deployment (see
+k8s-app.pinSingleItemName), so pin it first. */ -}}
+{{- $out := (include "k8s-app.pinSingleItemName" (dict "ctx" . "key" "controllers") | fromYaml).controllers -}}
 {{- $_ := set $out "migrations" (dict
       "type" "job"
       "annotations" (dict
@@ -63,4 +53,29 @@ unless the app names it itself. */ -}}
       "pod" (dict "restartPolicy" "Never")
       "containers" (dict "main" $container)) -}}
 {{- dict "controllers" $out | toYaml -}}
+{{- end -}}
+
+{{/*
+Everything the migrations Job reads must exist before its wave.
+
+ConfigMaps, Secrets and the ServiceAccount are wave 0 by default — the same
+wave as the Deployment — so a Job at wave -1 starts before them and its pod
+never gets created ("configmap ... not found", "serviceaccount ... not
+found"), which stalls the sync. Move them to wave -3, ahead of the preview
+database (-2) and the Job (-1). An item that sets its own sync-wave keeps it.
+*/}}
+{{- define "k8s-app.migrations.prerequisiteWaves" -}}
+{{- $out := dict -}}
+{{- range $key := (list "configMaps" "secrets" "serviceAccount") -}}
+  {{- $items := (get $.Values $key) | default dict -}}
+  {{- $keyOut := dict -}}
+  {{- range $name, $item := $items -}}
+    {{- $annotations := (dig "annotations" dict ($item | default dict)) -}}
+    {{- if not (hasKey $annotations "argocd.argoproj.io/sync-wave") -}}
+      {{- $_ := set $keyOut $name (dict "annotations" (dict "argocd.argoproj.io/sync-wave" "-3")) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if $keyOut -}}{{- $_ := set $out $key $keyOut -}}{{- end -}}
+{{- end -}}
+{{- $out | toYaml -}}
 {{- end -}}

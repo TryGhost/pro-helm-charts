@@ -113,10 +113,12 @@ jobs:
           [ "$(yq '.spec.template.spec.containers[0].probes // "none"' <<<"$j")" = "none" ]
           [ "$(yq '.spec.template.spec.restartPolicy' <<<"$j")" = "Never" ]
           [ "$(yq '.metadata.annotations["argocd.argoproj.io/sync-options"]' <<<"$j")" = "Force=true,Replace=true" ]
-          echo "the Job does not rename the app's own workload"
+          echo "chart-added resources never rename the app's own: Deployment and ConfigMap keep <release>"
           [ "$(yq 'select(.kind=="Deployment") | .metadata.name' "$r/staging.yaml")" = "myapp" ]
           [ "$(yq 'select(.kind=="Deployment") | .metadata.name' "$r/preview.yaml")" = "myapp" ]
-          echo "sync waves order the release: secrets -10, preview database -2, migrations -1, workloads 0"
+          [ "$(yq -r 'select(.kind=="ConfigMap") | .metadata.name' "$r/preview.yaml" | grep -v '^---$' | sort | head -1)" = "myapp" ]
+          echo "sync waves order the release: secrets -10, config -3, preview database -2, migrations -1, workloads 0"
+          [ "$(yq -r 'select(.kind=="ConfigMap" or .kind=="ServiceAccount") | .metadata.annotations["argocd.argoproj.io/sync-wave"]' "$r/preview.yaml" | grep -v '^---$' | sort -u)" = "-3" ]
           [ "$(yq -r 'select(.kind=="ExternalSecret") | .metadata.annotations["argocd.argoproj.io/sync-wave"]' "$r/preview.yaml" | grep -v '^---$' | sort -u)" = "-10" ]
           [ "$(yq 'select(.kind=="Job" and .metadata.name=="myapp-create-preview-db") | .metadata.annotations["argocd.argoproj.io/sync-wave"]' "$r/preview.yaml")" = "-2" ]
           [ "$(yq 'select(.kind=="Job" and .metadata.name=="myapp-migrations") | .metadata.annotations["argocd.argoproj.io/sync-wave"]' "$r/preview.yaml")" = "-1" ]

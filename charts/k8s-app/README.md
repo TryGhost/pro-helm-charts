@@ -61,7 +61,7 @@ version: 0.0.0
 dependencies:
   - name: k8s-app
     repository: https://tryghost.github.io/pro-helm-charts
-    version: 0.10.0
+    version: 0.10.1
 ```
 
 ```yaml
@@ -85,7 +85,7 @@ Outside gitops, the chart installs like any other:
 
 ```sh
 helm repo add ghost https://tryghost.github.io/pro-helm-charts
-helm install myapp ghost/k8s-app --version 0.10.0 -n myapp -f values.yaml
+helm install myapp ghost/k8s-app --version 0.10.1 -n myapp -f values.yaml
 ```
 
 Every release bundles its `common` dependency, so consumers never add the
@@ -1029,14 +1029,22 @@ Ordering is by ArgoCD sync wave, one sync, no hooks:
 | Wave | Resource |
 |---|---|
 | -10 | `app-secrets` / `app-db-secrets` ExternalSecrets — the Secrets exist and report Ready |
+| -3 | ConfigMaps, Secrets and the ServiceAccount — everything the Job's pod needs to start |
 | -2 | `previewDatabase` create Job — the per-PR database exists |
 | -1 | this Job — the schema is current |
 | 0 | Deployments, Services, routes, everything else |
+
+Wave -3 is not cosmetic: ConfigMaps, Secrets and the ServiceAccount are
+wave 0 like the Deployment, so without it the Job's pod is never created
+(`configmap ... not found`) and the sync stalls. An item that sets its own
+`sync-wave` keeps it.
 
 The app's own workload keeps its name: the library would otherwise rename it
 from `<release>` to `<release>-main` now that `controllers` holds two items,
 so the chart pins it with `forceRename` (unless the app already sets
 `forceRename`, `prefix` or `suffix`, or declares more than one controller).
+Hot reload's `git-sync-hosts` ConfigMap is pinned the same way, so enabling
+it does not rename the app's ConfigMap.
 
 The Job is annotated `Force=true,Replace=true` because Jobs are immutable: a
 new image sha recreates and re-runs it, an unchanged one stays completed and
@@ -1345,3 +1353,11 @@ initContainer (and any anchors that existed only to feed it) and state the
 command in the stanza. Sync waves moved with it: ExternalSecrets `-1` ->
 `-10`, the preview database create Job `0` -> `-2`, migrations `-1`,
 workloads `0`.
+
+### 0.10.1
+
+Fixes for 0.10.0: with `migrations.enabled`, ConfigMaps, Secrets and the
+ServiceAccount move to sync-wave -3 so the Job's pod can start (it failed
+with `configmap ... not found` and stalled the sync), and hot reload's own
+ConfigMap no longer renames the app's ConfigMap from `<release>` to
+`<release>-config`.

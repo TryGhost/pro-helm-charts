@@ -35,6 +35,11 @@ containers it adds do not. */ -}}
 {{- $_ := mergeOverwrite .Values (include "k8s-app.hotReload.values" . | fromYaml) -}}
 {{- end }}
 
+{{- /* After hotReload so its own ConfigMap lands in the same wave */ -}}
+{{- if .Values.migrations.enabled }}
+{{- $_ := mergeOverwrite .Values (include "k8s-app.migrations.prerequisiteWaves" . | fromYaml) -}}
+{{- end }}
+
 {{- /* After hotReload so the git-sync sidecar's own env is respected too */ -}}
 {{- $_ := mergeOverwrite .Values (include "k8s-app.envInjection.values" . | fromYaml) -}}
 

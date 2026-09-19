@@ -6,6 +6,8 @@ metadata:
     app.kubernetes.io/instance: myapp
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: myapp
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"
   namespace: myapp
 data:
   LOG_LEVEL: info
@@ -349,4 +351,6 @@ metadata:
     app.kubernetes.io/instance: myapp
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: myapp
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"
   namespace: myapp

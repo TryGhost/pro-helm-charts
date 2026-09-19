@@ -138,6 +138,11 @@ controllers:
           {{- include "k8s-app.hotReload.defaultArgs" . | nindent 10 }}
         {{- end }}
 configMaps:
+  {{- /* This second ConfigMap would rename the app's own one
+       (see k8s-app.pinSingleItemName), so pin that first. */}}
+  {{- with (include "k8s-app.pinSingleItemName" (dict "ctx" . "key" "configMaps") | fromYaml).configMaps }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}
   git-sync-hosts:
     data:
       known_hosts: {{ $hr.ssh.knownHosts | quote }}
