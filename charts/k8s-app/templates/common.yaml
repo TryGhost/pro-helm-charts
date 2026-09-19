@@ -17,6 +17,13 @@ global:
 {{- end -}}
 {{- $_ := mergeOverwrite .Values (include "k8s-app.hardcodedValues" . | fromYaml) -}}
 
+{{- /* Before the env fill and hotReload: the migrations Job copies the app's
+container as declared, then gets the same injected env as every other
+container. */ -}}
+{{- if .Values.migrations.enabled }}
+{{- $_ := mergeOverwrite .Values (include "k8s-app.migrations.values" . | fromYaml) -}}
+{{- end }}
+
 {{- /* The app-db-secrets Secret comes with the env that reads it. Before
 hotReload, so the app's own containers get the credentials and the git-sync
 containers it adds do not. */ -}}

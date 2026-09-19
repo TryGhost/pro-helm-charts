@@ -3,11 +3,11 @@ Replaces the k8s repo's components/db-previews Kustomize component: two Jobs
 that differ only in name, ArgoCD annotations and the SQL statement.
 
 create: NOT a PreSync hook, deliberately. The job reads credentials from the
-app-db-secrets Secret, which the app-db-secrets ExternalSecret (sync-wave -1)
-only materializes during the main sync — a PreSync hook would deadlock on a
-fresh namespace waiting for a Secret the sync hasn't applied yet. It runs in
-wave 0 with the workloads, after the ExternalSecret reports Ready; the app's
-migrate initContainer retries until the database exists. CREATE IF NOT
+app-db-secrets Secret, which the app-db-secrets ExternalSecret only
+materializes during the main sync — a PreSync hook would deadlock on a fresh
+namespace waiting for a Secret the sync hasn't applied yet. It runs inside
+the sync at wave -2: after the ExternalSecrets (wave -10) report Ready and
+before the migrations Job (wave -1) and the workloads (wave 0). CREATE IF NOT
 EXISTS is idempotent. The completed Job is kept (no ttlSecondsAfterFinished)
 so ArgoCD sees it in sync and never re-runs it: once per PR. Jobs are
 immutable — even kubectl replace fails because the live Job carries a
@@ -21,7 +21,7 @@ is removed by its hook-delete-policy.
 {{- if .Values.previewDatabase.enabled }}
 {{- $jobs := list
   (dict "suffix" "create-preview-db" "container" "create"
-        "annotations" (dict "argocd.argoproj.io/sync-wave" "0" "argocd.argoproj.io/sync-options" "Force=true,Replace=true")
+        "annotations" (dict "argocd.argoproj.io/sync-wave" "-2" "argocd.argoproj.io/sync-options" "Force=true,Replace=true")
         "guard" "bad GITHUB_PR_NUMBER: $GITHUB_PR_NUMBER"
         "sql" "CREATE DATABASE IF NOT EXISTS \\`${APP_NAME}_preview_${GITHUB_PR_NUMBER}\\` CHARACTER SET utf8mb4"
         "done" "created")

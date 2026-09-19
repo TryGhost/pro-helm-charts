@@ -13,7 +13,7 @@ controllers:
   main:
     containers:
       main:
-        env: &previewDb
+        env:
           db__connection__database: $(APP_NAME)_preview_$(GITHUB_PR_NUMBER)
         resources:
           requests:
@@ -22,9 +22,6 @@ controllers:
           limits:
             cpu: 1
             memory: 1Gi
-    initContainers:
-      migrate:
-        env: *previewDb
 
 route:
   main:

@@ -49,51 +49,6 @@ spec:
       dnsPolicy: ClusterFirst
       imagePullSecrets:
         - name: ghost
-      initContainers:
-        - command:
-            - ./node_modules/.bin/knex
-            - migrate:latest
-          env:
-            - name: APP_NAME
-              value: myapp
-            - name: GITHUB_PR_NUMBER
-              value: ""
-            - name: db__client
-              value: mysql2
-            - name: db__connection__charset
-              value: utf8mb4
-            - name: db__connection__database
-              value: myapp
-            - name: db__connection__host
-              valueFrom:
-                secretKeyRef:
-                  key: host
-                  name: app-db-secrets
-            - name: db__connection__password
-              valueFrom:
-                secretKeyRef:
-                  key: password
-                  name: app-db-secrets
-            - name: db__connection__port
-              valueFrom:
-                secretKeyRef:
-                  key: port
-                  name: app-db-secrets
-            - name: db__connection__ssl__ca
-              valueFrom:
-                secretKeyRef:
-                  key: ssl_ca
-                  name: app-db-secrets
-            - name: db__connection__user
-              valueFrom:
-                secretKeyRef:
-                  key: user
-                  name: app-db-secrets
-          envFrom:
-            - configMapRef:
-                name: myapp
-          image: registry.digitalocean.com/ghost/myapp:__IMAGE_SHA__
-          name: migrate
       containers:
         - command:
             - node
@@ -173,8 +128,8 @@ metadata:
     app.kubernetes.io/instance: myapp
     app.kubernetes.io/managed-by: Helm
   annotations:
-    # Wave -1: the Secret must exist (ES Ready) before wave-0 consumers start
-    argocd.argoproj.io/sync-wave: "-1"
+    # Wave -10: the Secrets must exist (ES Ready) before anything reads them
+    argocd.argoproj.io/sync-wave: "-10"
     # Namespace-shared infrastructure, consumed by every release in the
     # namespace: previews bootstrap these ExternalSecrets and the staging
     # release later co-manages/adopts them. Prune=false means disabling
@@ -231,8 +186,8 @@ metadata:
     app.kubernetes.io/instance: myapp
     app.kubernetes.io/managed-by: Helm
   annotations:
-    # Wave -1: the Secret must exist (ES Ready) before wave-0 consumers start
-    argocd.argoproj.io/sync-wave: "-1"
+    # Wave -10: the Secrets must exist (ES Ready) before anything reads them
+    argocd.argoproj.io/sync-wave: "-10"
     # Namespace-shared infrastructure, consumed by every release in the
     # namespace: previews bootstrap these ExternalSecrets and the staging
     # release later co-manages/adopts them. Prune=false means disabling
@@ -281,6 +236,87 @@ spec:
           namespace: myapp
           port: 3000
           weight: 1
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: myapp-migrations
+  labels:
+    app.kubernetes.io/controller: migrations
+    app.kubernetes.io/instance: myapp
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: myapp
+  annotations:
+    argocd.argoproj.io/sync-options: Force=true,Replace=true
+    argocd.argoproj.io/sync-wave: "-1"
+  namespace: myapp
+spec:
+  suspend: false
+  backoffLimit: 2
+  template:
+    metadata:
+      annotations:
+        checksum/configMaps: 0e4b05b25c30a3bef599580d4b2cfc8c933176c7a052e90c0c5c654b3b3e3216
+      labels:
+        app.kubernetes.io/controller: migrations
+        app.kubernetes.io/instance: myapp
+        app.kubernetes.io/name: myapp
+    spec:
+      enableServiceLinks: false
+      serviceAccountName: myapp
+      automountServiceAccountToken: false
+      hostIPC: false
+      hostNetwork: false
+      hostPID: false
+      dnsPolicy: ClusterFirst
+      imagePullSecrets:
+        - name: ghost
+      restartPolicy: Never
+      containers:
+        - command:
+            - ./node_modules/.bin/knex
+            - migrate:latest
+          env:
+            - name: APP_NAME
+              value: myapp
+            - name: GITHUB_PR_NUMBER
+              value: ""
+            - name: db__client
+              value: mysql2
+            - name: db__connection__charset
+              value: utf8mb4
+            - name: db__connection__database
+              value: myapp
+            - name: db__connection__host
+              valueFrom:
+                secretKeyRef:
+                  key: host
+                  name: app-db-secrets
+            - name: db__connection__password
+              valueFrom:
+                secretKeyRef:
+                  key: password
+                  name: app-db-secrets
+            - name: db__connection__port
+              valueFrom:
+                secretKeyRef:
+                  key: port
+                  name: app-db-secrets
+            - name: db__connection__ssl__ca
+              valueFrom:
+                secretKeyRef:
+                  key: ssl_ca
+                  name: app-db-secrets
+            - name: db__connection__user
+              valueFrom:
+                secretKeyRef:
+                  key: user
+                  name: app-db-secrets
+          envFrom:
+            - configMapRef:
+                name: myapp
+          image: registry.digitalocean.com/ghost/myapp:__IMAGE_SHA__
+          name: main
 ---
 apiVersion: v1
 kind: Service

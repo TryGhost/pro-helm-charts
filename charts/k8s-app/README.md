@@ -2,8 +2,8 @@
 
 Ghost's application chart: [bjw-s `app-template`](https://bjw-s-labs.github.io/helm-charts/docs/app-template/)
 semantics, provided by the unmodified upstream `common` library pinned in
-`Chart.lock`, plus four option groups of our own (`preview`, `secretsInjection`,
-`hotReload`, `previewDatabase`) and a few defaults every release gets.
+`Chart.lock`, plus five option groups of our own (`preview`, `secretsInjection`,
+`migrations`, `hotReload`, `previewDatabase`) and a few defaults every release gets.
 
 This page documents every value the chart accepts. The prose explains what
 each area renders and how the pieces fit; the tables under each section are
@@ -35,6 +35,7 @@ Contents
 - [Anything else: `rawResources`](#anything-else-rawresources)
 - [k8s-app: preview facts `preview`](#k8s-app-preview-facts-preview)
 - [k8s-app: secret injection `secretsInjection`](#k8s-app-secret-injection-secretsinjection)
+- [k8s-app: migrations `migrations`](#k8s-app-migrations-migrations)
 - [k8s-app: hot reload `hotReload`](#k8s-app-hot-reload-hotreload)
 - [k8s-app: preview database `previewDatabase`](#k8s-app-preview-database-previewdatabase)
 - [k8s-app: defaults applied to every release](#k8s-app-defaults-applied-to-every-release)
@@ -60,7 +61,7 @@ version: 0.0.0
 dependencies:
   - name: k8s-app
     repository: https://tryghost.github.io/pro-helm-charts
-    version: 0.9.0
+    version: 0.10.0
 ```
 
 ```yaml
@@ -84,7 +85,7 @@ Outside gitops, the chart installs like any other:
 
 ```sh
 helm repo add ghost https://tryghost.github.io/pro-helm-charts
-helm install myapp ghost/k8s-app --version 0.9.0 -n myapp -f values.yaml
+helm install myapp ghost/k8s-app --version 0.10.0 -n myapp -f values.yaml
 ```
 
 Every release bundles its `common` dependency, so consumers never add the
@@ -937,7 +938,7 @@ and, with `database: true`, the `app-db-secrets` ExternalSecret (Terraform's
 `<env>-<app>db` JSON secret exploded into `host`, `public_host`, `port`,
 `user`, `password`, `database`, `uri`, `public_uri`, `ssl_ca`). Both sync
 every `refreshInterval` from the named ClusterSecretStore, carry ArgoCD
-sync-wave `-1` so the Secrets exist before workloads start, and are marked
+sync-wave `-10` so the Secrets exist before anything reads them, and are marked
 `Prune=false,Delete=false` because they are namespace-shared: previews can
 bootstrap them, later releases co-manage them, and nothing in a preview's
 lifecycle removes them.
@@ -1005,6 +1006,55 @@ the rendered ExternalSecrets are in [`tests/snapshots/staging.yaml`](tests/snaps
 | `secretsInjection.store` | object |  | The (Cluster)SecretStore both ExternalSecrets read from. |
 | `secretsInjection.store.kind` | string (ClusterSecretStore, SecretStore) | `"ClusterSecretStore"` | Kind of the store: ClusterSecretStore or SecretStore. |
 | `secretsInjection.store.name` | string | `"gcp-secrets-manager"` | Name of the (Cluster)SecretStore to read from. |
+<!-- /values -->
+
+## k8s-app: migrations `migrations`
+
+One Job, `<release>-migrations`, that runs `command` in the app's own image
+before the workloads start. Its container is the container named by
+`controller`/`container` (`main`/`main`) with `command` replaced: the same
+image, `envFrom` and `env`, including the database variables the chart
+injects and any override the environment adds, so migrations and the app
+always read the same configuration. Probes, args and lifecycle are not
+copied — they belong to the long-running container.
+
+```yaml
+migrations:
+  enabled: true
+  command: [./node_modules/.bin/knex, migrate:latest]
+```
+
+Ordering is by ArgoCD sync wave, one sync, no hooks:
+
+| Wave | Resource |
+|---|---|
+| -10 | `app-secrets` / `app-db-secrets` ExternalSecrets — the Secrets exist and report Ready |
+| -2 | `previewDatabase` create Job — the per-PR database exists |
+| -1 | this Job — the schema is current |
+| 0 | Deployments, Services, routes, everything else |
+
+The app's own workload keeps its name: the library would otherwise rename it
+from `<release>` to `<release>-main` now that `controllers` holds two items,
+so the chart pins it with `forceRename` (unless the app already sets
+`forceRename`, `prefix` or `suffix`, or declares more than one controller).
+
+The Job is annotated `Force=true,Replace=true` because Jobs are immutable: a
+new image sha recreates and re-runs it, an unchanged one stays completed and
+ArgoCD keeps seeing it in sync. A failing migration fails the sync and the
+old pods keep running, because the new Deployment is a later wave.
+
+In a hot-reload preview the Job still runs the image's code, not the code
+git-sync delivers — a preview whose migrations changed needs an image build.
+
+<!-- values: migrations -->
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `migrations` | object |  | Database migrations Job: runs `command` in the app's own container (image, envFrom and env, including the injected database vars) at ArgoCD sync-wave -1, after the preview database (-2) and before the workloads (0). |
+| `migrations.backoffLimit` | integer | `2` | Job retries before the sync fails. |
+| `migrations.command` | array | `[]` | Command that runs the migrations, e.g. [./node_modules/.bin/knex, migrate:latest]. Required when enabled. |
+| `migrations.container` | string | `"main"` | Container in that controller to copy image, envFrom and env from. |
+| `migrations.controller` | string | `"main"` | Controller (under controllers) whose container the Job copies. |
+| `migrations.enabled` | boolean | `false` | Render the migrations Job. |
 <!-- /values -->
 
 ## k8s-app: hot reload `hotReload`
@@ -1095,11 +1145,12 @@ run `mysql:8.4` with `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASS` from the
 database is `<namespace>_preview_<pr>`; a shell guard refuses a non-numeric
 PR number.
 
-- **create**: ArgoCD sync-wave 0 with `Force=true,Replace=true`, deliberately
+- **create**: ArgoCD sync-wave -2 with `Force=true,Replace=true`, deliberately
   not a PreSync hook. It needs the `app-db-secrets` Secret, which the
-  wave -1 ExternalSecret only materialises during the sync, so a PreSync hook
-  would deadlock on a fresh namespace; the app's migrate init container
-  retries until the database exists. `CREATE DATABASE IF NOT EXISTS ...
+  wave -10 ExternalSecret only materialises during the sync, so a PreSync hook
+  would deadlock on a fresh namespace. Wave -2 puts it after the Secrets and
+  before the migrations Job (-1) and the workloads (0).
+  `CREATE DATABASE IF NOT EXISTS ...
   CHARACTER SET utf8mb4` is idempotent. It runs once per PR: the completed
   Job has no TTL, stays in the namespace, and ArgoCD keeps seeing it in sync.
 - **drop**: `PostDelete` hook with `HookSucceeded` delete policy, runs
@@ -1284,3 +1335,13 @@ can be deleted from app values. Keep any env the app overrides, such as a
 preview's `db__connection__database`; anything an app still declares itself
 wins over the injected value, so apps upgrade without touching their values
 first.
+
+### 0.10.0
+
+`migrations.enabled: true` replaces the migration initContainer with a Job in
+its own sync wave, so the migration runs once per sync instead of once per
+pod and a failure stops the rollout instead of crash-looping it. Delete the
+initContainer (and any anchors that existed only to feed it) and state the
+command in the stanza. Sync waves moved with it: ExternalSecrets `-1` ->
+`-10`, the preview database create Job `0` -> `-2`, migrations `-1`,
+workloads `0`.

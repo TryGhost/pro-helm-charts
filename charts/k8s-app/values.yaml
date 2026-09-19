@@ -54,6 +54,24 @@ secretsInjection:
     # -- Kind of the store: ClusterSecretStore or SecretStore.
     kind: ClusterSecretStore
 
+# -- Database migrations. Renders one Job that runs `command` in the app's
+# own image before the workloads start (ArgoCD sync waves: ExternalSecrets
+# -10, preview database -2, this Job -1, everything else 0). The Job's
+# container is the app's container with `command` replaced — same image, same
+# envFrom, same env, including the injected database vars — so migrations and
+# the app always read the same configuration.
+migrations:
+  enabled: false
+  # -- Command that runs the migrations, e.g.
+  # [./node_modules/.bin/knex, migrate:latest]. Required when enabled.
+  command: []
+  # -- Controller (under `controllers`) whose container the Job copies.
+  controller: main
+  # -- Container in that controller to copy image, envFrom and env from.
+  container: main
+  # -- Job retries before the sync fails.
+  backoffLimit: 2
+
 # -- Hot reload for PR previews. Adds a git-sync init container and sidecar
 # to one controller, a shared emptyDir workspace, and swaps the app
 # container's command for a file-watching dev runner. The image supplies

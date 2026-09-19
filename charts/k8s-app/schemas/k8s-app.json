@@ -53,6 +53,49 @@
       "store"
     ]
   },
+  "migrations": {
+    "description": "Database migrations Job: runs `command` in the app's own container (image, envFrom and env, including the injected database vars) at ArgoCD sync-wave -1, after the preview database (-2) and before the workloads (0).",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {
+        "description": "Render the migrations Job.",
+        "type": "boolean",
+        "default": false
+      },
+      "command": {
+        "description": "Command that runs the migrations, e.g. [./node_modules/.bin/knex, migrate:latest]. Required when enabled.",
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "default": []
+      },
+      "controller": {
+        "description": "Controller (under controllers) whose container the Job copies.",
+        "type": "string",
+        "minLength": 1,
+        "default": "main"
+      },
+      "container": {
+        "description": "Container in that controller to copy image, envFrom and env from.",
+        "type": "string",
+        "minLength": 1,
+        "default": "main"
+      },
+      "backoffLimit": {
+        "description": "Job retries before the sync fails.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 2
+      }
+    },
+    "required": [
+      "enabled",
+      "controller",
+      "container"
+    ]
+  },
   "hotReload": {
     "description": "git-sync based hot reload for PR previews.",
     "type": "object",
