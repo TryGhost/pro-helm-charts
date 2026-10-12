@@ -1000,7 +1000,8 @@ Facts about a PR preview that the platform knows and apps must not repeat.
 The pull-request ApplicationSet passes `preview.prNumber` as a Helm parameter
 (`k8s-app.preview.prNumber={{.number}}` on the umbrella chart); it drives the
 injected `GITHUB_PR_NUMBER` env var, the `pull-request` pod label,
-`hotReload`'s git ref and `previewDatabase`'s database name. `preview.gitRepo`
+`hotReload`'s git ref and `previewDatabase`'s database name, and gives every
+preview pod the low `preview.priorityClassName`. `preview.gitRepo`
 is derived from `preview.owner` and the release namespace (app name ==
 namespace == repository name by convention) and only needs setting when the
 repository name differs from the slug (`Daisy.js` vs `daisy-js`). Outside
@@ -1013,6 +1014,7 @@ previews the group is empty and nothing preview-specific renders.
 | `preview.gitRepo` | string | `""` | SSH clone URL for hotReload. Empty = git@github.com:<owner>/<release namespace>.git. |
 | `preview.owner` | string | `"TryGhost"` | GitHub owner used when deriving gitRepo. |
 | `preview.prNumber` | string / integer | `""` | Pull request number (render-time literal). |
+| `preview.priorityClassName` | string | `"preview"` | PriorityClass given to every preview pod unless defaultPodOptions.priorityClassName is set, so previews are preempted first. Cluster-scoped, created by terraform (pro-infra) on staging only; must exist. |
 <!-- /values -->
 
 ## k8s-app: secret injection `secretsInjection`
@@ -1359,6 +1361,11 @@ configuration; it selects nothing by itself:
   wins.
 - **`pull-request` pod label** from `preview.prNumber`, for `kubectl -l` and
   log correlation.
+- **`priorityClassName: preview`** (`preview.priorityClassName`) on every pod
+  of a PR preview, including the preview database Jobs, so other apps' pods
+  preempt previews when a node is full. Unless
+  `defaultPodOptions.priorityClassName` is set; a controller's
+  `pod.priorityClassName` wins as usual. Nothing is set outside previews.
 - **`imagePullSecrets`**: `[{name: ghost}]` unless `defaultPodOptions.imagePullSecrets`
   is set. DOKS keeps that secret in every namespace but only attaches it to
   the default ServiceAccount, and the chart uses its own.
@@ -1446,3 +1453,11 @@ ServiceAccount move to sync-wave -3 so the Job's pod can start (it failed
 with `configmap ... not found` and stalled the sync), and hot reload's own
 ConfigMap no longer renames the app's ConfigMap from `<release>` to
 `<release>-config`.
+
+### 0.11.0
+
+PR preview pods get `priorityClassName: preview`, so they are evicted first
+when other apps need the room. The PriorityClass is cluster-scoped and
+created by terraform (pro-infra) on staging only, where previews run; a
+preview rendered with this version on any other cluster has its pods
+rejected by the API server.

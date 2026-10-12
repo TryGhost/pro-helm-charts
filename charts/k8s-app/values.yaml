@@ -26,6 +26,12 @@ preview:
   gitRepo: ""
   # -- GitHub owner used when deriving gitRepo.
   owner: TryGhost
+  # -- PriorityClass given to every preview pod (unless
+  # defaultPodOptions.priorityClassName is set), so previews are preempted
+  # before anything else when a node is full. Cluster-scoped and managed in
+  # terraform (pro-infra), staging only; it must exist or preview pods are
+  # rejected at admission.
+  priorityClassName: preview
 
 # -- External Secrets injection: the app-secrets / app-db-secrets
 # ExternalSecrets for the release namespace. Assumes External Secrets

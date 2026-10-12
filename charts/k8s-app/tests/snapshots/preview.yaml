@@ -60,6 +60,7 @@ spec:
       enableServiceLinks: false
       serviceAccountName: myapp
       automountServiceAccountToken: false
+      priorityClassName: preview
       securityContext:
         fsGroup: 65533
       hostIPC: false
@@ -384,6 +385,7 @@ spec:
   template:
     spec:
       restartPolicy: Never
+      priorityClassName: preview
       containers:
         - name: create
           image: mysql:26.7
@@ -438,6 +440,7 @@ spec:
   template:
     spec:
       restartPolicy: Never
+      priorityClassName: preview
       containers:
         - name: drop
           image: mysql:26.7
@@ -505,6 +508,7 @@ spec:
       enableServiceLinks: false
       serviceAccountName: myapp
       automountServiceAccountToken: false
+      priorityClassName: preview
       securityContext:
         fsGroup: 65533
       hostIPC: false
