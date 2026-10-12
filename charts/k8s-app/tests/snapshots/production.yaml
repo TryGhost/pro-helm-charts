@@ -31,8 +31,8 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/controller: main
-      app.kubernetes.io/name: myapp
       app.kubernetes.io/instance: myapp
+      app.kubernetes.io/name: myapp
   template:
     metadata:
       annotations:
