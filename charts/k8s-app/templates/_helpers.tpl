@@ -19,3 +19,13 @@ verbatim. Usage: {{ include "k8s-app.esoField" "private_host" }}
 {{- define "k8s-app.esoField" -}}
 {{- printf "{{ (.db | fromJson).%s }}" . | squote -}}
 {{- end -}}
+
+{{/*
+PriorityClass for preview pods: preview.priorityClassName on PR previews,
+empty otherwise.
+*/}}
+{{- define "k8s-app.preview.priorityClassName" -}}
+{{- if .Values.preview.prNumber -}}
+{{- .Values.preview.priorityClassName -}}
+{{- end -}}
+{{- end -}}

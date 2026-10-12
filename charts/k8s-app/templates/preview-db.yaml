@@ -47,6 +47,9 @@ spec:
   template:
     spec:
       restartPolicy: Never
+      {{- with (include "k8s-app.preview.priorityClassName" $) }}
+      priorityClassName: {{ . }}
+      {{- end }}
       containers:
         - name: {{ $job.container }}
           image: {{ include "k8s-app.previewDatabase.image" $ }}

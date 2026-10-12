@@ -22,6 +22,15 @@ to RollingUpdate instead. User-declared strategy always wins.
 {{- if .Values.preview.prNumber -}}
   {{- $_ := set $dpo "labels" (dict "pull-request" (.Values.preview.prNumber | toString)) -}}
 {{- end -}}
+{{- /* Previews are the first to go when a node is full: a low PriorityClass
+       lets other apps' pods preempt them. A user-set
+       defaultPodOptions.priorityClassName wins (per-controller
+       pod.priorityClassName already overrides defaultPodOptions). */ -}}
+{{- with (include "k8s-app.preview.priorityClassName" .) -}}
+  {{- if not (dig "priorityClassName" "" ($.Values.defaultPodOptions | default dict)) -}}
+    {{- $_ := set $dpo "priorityClassName" . -}}
+  {{- end -}}
+{{- end -}}
 {{- /* DO's DOKS registry integration maintains the `ghost` pull secret in
        every namespace but only attaches it to the default ServiceAccount;
        the chart uses its own SA, so attach it here. A user-set (non-empty)
