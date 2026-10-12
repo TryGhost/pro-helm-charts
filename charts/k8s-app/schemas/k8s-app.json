@@ -383,7 +383,7 @@
         "default": "TryGhost"
       },
       "priorityClassName": {
-        "description": "PriorityClass given to every preview pod unless defaultPodOptions.priorityClassName is set, so previews are preempted first. Cluster-scoped, managed outside the chart; must exist.",
+        "description": "PriorityClass given to every preview pod unless defaultPodOptions.priorityClassName is set, so previews are preempted first. Cluster-scoped, created by terraform (pro-infra) on staging only; must exist.",
         "type": "string",
         "default": "preview"
       }

@@ -1014,7 +1014,7 @@ previews the group is empty and nothing preview-specific renders.
 | `preview.gitRepo` | string | `""` | SSH clone URL for hotReload. Empty = git@github.com:<owner>/<release namespace>.git. |
 | `preview.owner` | string | `"TryGhost"` | GitHub owner used when deriving gitRepo. |
 | `preview.prNumber` | string / integer | `""` | Pull request number (render-time literal). |
-| `preview.priorityClassName` | string | `"preview"` | PriorityClass given to every preview pod unless defaultPodOptions.priorityClassName is set, so previews are preempted first. Cluster-scoped, managed outside the chart; must exist. |
+| `preview.priorityClassName` | string | `"preview"` | PriorityClass given to every preview pod unless defaultPodOptions.priorityClassName is set, so previews are preempted first. Cluster-scoped, created by terraform (pro-infra) on staging only; must exist. |
 <!-- /values -->
 
 ## k8s-app: secret injection `secretsInjection`
@@ -1457,6 +1457,7 @@ ConfigMap no longer renames the app's ConfigMap from `<release>` to
 ### 0.11.0
 
 PR preview pods get `priorityClassName: preview`, so they are evicted first
-when other apps need the room. The PriorityClass is cluster-scoped and lives
-in the k8s repo; it must exist in a cluster before a preview renders with
-this version, or the API server rejects its pods.
+when other apps need the room. The PriorityClass is cluster-scoped and
+created by terraform (pro-infra) on staging only, where previews run; a
+preview rendered with this version on any other cluster has its pods
+rejected by the API server.
