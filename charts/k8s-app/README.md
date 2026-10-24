@@ -1234,8 +1234,9 @@ Example: [`examples/k8s-app/values.preview.yaml`](../../examples/k8s-app/values.
 
 Gives each PR preview its own MySQL database on the app's managed cluster.
 Two Jobs named `<release>-create-preview-db` and `<release>-drop-preview-db`
-run `mysql:26.7` with `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASS` from the
-`app-db-secrets` Secret (so it pairs with `secretsInjection.database: true`),
+run the `previewDatabase.image` MySQL client with
+`DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASS` from the `app-db-secrets` Secret
+(so it pairs with `secretsInjection.database: true`),
 `APP_NAME` (the namespace) and `GITHUB_PR_NUMBER` (`preview.prNumber`). The
 database is `<namespace>_preview_<pr>`; a shell guard refuses a non-numeric
 PR number.
@@ -1273,7 +1274,7 @@ controllers:
 | `previewDatabase.enabled` | boolean | `false` | Create the per-PR database Jobs. |
 | `previewDatabase.image` | object |  | MySQL client image used by both Jobs. |
 | `previewDatabase.image.repository` | string | `"mysql"` |  |
-| `previewDatabase.image.tag` | string | `"26.7"` |  |
+| `previewDatabase.image.tag` | string |  | Default in values.yaml (kept current by Renovate). |
 | `previewDatabase.keys` | object |  | Keys inside secretName holding host, port, user and password. |
 | `previewDatabase.keys.host` | string | `"host"` |  |
 | `previewDatabase.keys.password` | string | `"password"` |  |

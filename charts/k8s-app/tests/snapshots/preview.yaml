@@ -88,7 +88,7 @@ spec:
               value: refs/pull/__GITHUB_PR_NUMBER__/head
             - name: GITSYNC_REPO
               value: git@github.com:TryGhost/myapp.git
-          image: registry.k8s.io/git-sync/git-sync:v4.7.1
+          image: registry.k8s.io/git-sync/git-sync:__DEFAULT_TAG__
           name: git-sync-init
           resources:
             limits:
@@ -134,7 +134,7 @@ spec:
               value: refs/pull/__GITHUB_PR_NUMBER__/head
             - name: GITSYNC_REPO
               value: git@github.com:TryGhost/myapp.git
-          image: registry.k8s.io/git-sync/git-sync:v4.7.1
+          image: registry.k8s.io/git-sync/git-sync:__DEFAULT_TAG__
           name: git-sync
           resources:
             limits:
@@ -388,7 +388,7 @@ spec:
       priorityClassName: preview
       containers:
         - name: create
-          image: mysql:26.7
+          image: mysql:__DEFAULT_TAG__
           env:
             - name: DB_USER
               valueFrom:
@@ -443,7 +443,7 @@ spec:
       priorityClassName: preview
       containers:
         - name: drop
-          image: mysql:26.7
+          image: mysql:__DEFAULT_TAG__
           env:
             - name: DB_USER
               valueFrom:

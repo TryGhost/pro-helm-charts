@@ -8,9 +8,12 @@
 #   charts/k8s-app/tests/snapshots/    helm template of examples/k8s-app per
 #                                      environment, documents sorted by kind +
 #                                      name, minus the helm.sh/chart label so
-#                                      version bumps don't touch every snapshot
+#                                      version bumps don't touch every snapshot,
+#                                      and chart-default image tags replaced by
+#                                      __DEFAULT_TAG__ so Renovate image bumps
+#                                      don't either
 #
-# Needs: helm (with the bjw-s repo added), jq.
+# Needs: helm (with the bjw-s repo added), jq, yq.
 set -eu
 cd "$(dirname "$0")/.."
 CHART=charts/k8s-app
@@ -45,6 +48,17 @@ done < "$md"
 mv "$out" "$md"
 
 EX=examples/k8s-app
+# Chart-default images (repository:tag from values.yaml) as sed patterns. Only
+# the default is masked: an image an example overrides still shows in full.
+esc() { printf '%s' "$1" | sed 's/[][\\.*^$|]/\\&/g'; }
+default_tags=""
+nl='
+'
+for img in .hotReload.gitSync.image .previewDatabase.image; do
+  repo=$(yq "$img.repository" "$CHART/values.yaml")
+  tag=$(yq "$img.tag" "$CHART/values.yaml")
+  default_tags="$default_tags${nl}s|^\\([[:space:]]*image:[[:space:]]*$(esc "$repo")\\):$(esc "$tag")\$|\\1:__DEFAULT_TAG__|"
+done
 render() { # <output name> <values files...>
   out=$1; shift
   # documents sorted by kind + name: the library's own emission order is not
@@ -52,7 +66,8 @@ render() { # <output name> <values files...>
   helm template myapp "$CHART" -n myapp -f "$EX/values.base.yaml" "$@" \
     | grep -v '^# Source: ' \
     | yq ea 'select(. != null) as $d ireduce ([]; . + [$d]) | sort_by(.kind, .metadata.name) | .[] | split_doc' \
-    | grep -v '^\s*helm.sh/chart: ' > "$CHART/tests/snapshots/$out.yaml"
+    | grep -v '^\s*helm.sh/chart: ' \
+    | sed "$default_tags" > "$CHART/tests/snapshots/$out.yaml"
 }
 for env in staging production; do
   render "$env" -f "$EX/values.$env.yaml"

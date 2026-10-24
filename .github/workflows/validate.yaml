@@ -156,8 +156,21 @@ jobs:
           yq 'select(.kind=="HTTPRoute" and .metadata.name=="myapp-gateway-external-https-redirect") | .spec.rules[0].filters[0].type' <<<"$d" | grep -qx RequestRedirect
           yq 'select(.kind=="HTTPRoute" and .metadata.name=="myapp") | .spec.parentRefs[0].name' <<<"$d" | grep -qx myapp-gateway-external
           ! helm template myapp "$CHART" -n myapp -f "$EX/values.base.yaml" -f "$EX/values.preview.yaml" --set preview.prNumber=123 --set route.main.gateway=dedicated-internal
-          echo "expected images come from chart defaults (Renovate bumps must not need assertion edits)"
-          [ "$(yq 'select(.kind=="Deployment") | .spec.template.spec.containers[] | select(.name=="git-sync") | .image' "$r/preview.yaml")" = "$(yq '.hotReload.gitSync.image.repository + ":" + .hotReload.gitSync.image.tag' "$CHART/values.yaml")" ]
+          echo "git-sync and mysql images render the chart defaults (masked as __DEFAULT_TAG__ in the snapshots), and an override wins"
+          img() { # <values.yaml image path> [helm args...]: the rendered images of the containers using it
+            case "$1" in
+              .hotReload.gitSync.image) q='select(.kind=="Deployment") | .spec.template.spec | [.containers[], .initContainers[]] | .[] | select(.name=="git-sync" or .name=="git-sync-init") | .image' ;;
+              .previewDatabase.image) q='select(.kind=="Job" and (.metadata.name | test("-(create|drop)-preview-db$"))) | .spec.template.spec.containers[0].image' ;;
+            esac
+            shift
+            helm template myapp "$CHART" -n myapp -f "$EX/values.base.yaml" -f "$EX/values.preview.yaml" --set preview.prNumber=123 "$@" \
+              | yq "$q" | grep -v '^---$' | sort -u
+          }
+          for p in .hotReload.gitSync.image .previewDatabase.image; do
+            [ "$(img "$p" | wc -l)" -eq 1 ]
+            [ "$(img "$p")" = "$(yq "$p.repository + \":\" + $p.tag" "$CHART/values.yaml")" ]
+            [ "$(img "$p" --set "${p#.}.tag=override")" = "$(yq "$p.repository" "$CHART/values.yaml"):override" ]
+          done
 
   version-bump:
     name: Chart version bumped
