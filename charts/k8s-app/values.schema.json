@@ -16069,7 +16069,7 @@
                 "tag": {
                   "type": "string",
                   "minLength": 1,
-                  "default": "v4.4.2"
+                  "description": "Default in values.yaml (kept current by Renovate)."
                 }
               },
               "required": [

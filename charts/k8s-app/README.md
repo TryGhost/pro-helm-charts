@@ -1214,7 +1214,7 @@ Example: [`examples/k8s-app/values.preview.yaml`](../../examples/k8s-app/values.
 | `hotReload.gitSync.gid` | integer | `65533` | gid git-sync runs as; also the pod fsGroup so the mounted SSH key is readable. |
 | `hotReload.gitSync.image` | object |  | git-sync image (repository + tag). |
 | `hotReload.gitSync.image.repository` | string | `"registry.k8s.io/git-sync/git-sync"` |  |
-| `hotReload.gitSync.image.tag` | string | `"v4.4.2"` |  |
+| `hotReload.gitSync.image.tag` | string |  | Default in values.yaml (kept current by Renovate). |
 | `hotReload.gitSync.link` | string | `"app"` | Symlink name under root that git-sync publishes atomically (--link). |
 | `hotReload.gitSync.period` | string | `"2s"` | Polling interval for the sidecar. |
 | `hotReload.gitSync.resources` | object |  | Resources for both git-sync containers. |

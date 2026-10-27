@@ -48,16 +48,19 @@ done < "$md"
 mv "$out" "$md"
 
 EX=examples/k8s-app
-# Chart-default images (repository:tag from values.yaml) as sed patterns. Only
-# the default is masked: an image an example overrides still shows in full.
-esc() { printf '%s' "$1" | sed 's/[][\\.*^$|]/\\&/g'; }
+# Chart-default images: every repository + tag map in values.yaml, so a new
+# image is masked without touching this script. Only the default is masked: an
+# image an example overrides still shows in full. '#' is the sed delimiter as
+# it can't appear in an image reference.
+esc() { printf '%s' "$1" | sed 's/[][\\.*^$]/\\&/g'; }
 default_tags=""
 nl='
 '
-for img in .hotReload.gitSync.image .previewDatabase.image; do
+for img in $(yq '.. | select(tag == "!!map" and has("repository") and has("tag")) | path | "." + join(".")' "$CHART/values.yaml"); do
   repo=$(yq "$img.repository" "$CHART/values.yaml")
   tag=$(yq "$img.tag" "$CHART/values.yaml")
-  default_tags="$default_tags${nl}s|^\\([[:space:]]*image:[[:space:]]*$(esc "$repo")\\):$(esc "$tag")\$|\\1:__DEFAULT_TAG__|"
+  # image: repo:tag, optionally as a list item's first key and/or quoted
+  default_tags="$default_tags${nl}s#^\\([[:space:]]*\\(- \\)\\{0,1\\}image:[[:space:]]*[\"']\\{0,1\\}$(esc "$repo")\\):$(esc "$tag")\\([\"']\\{0,1\\}\\)\$#\\1:__DEFAULT_TAG__\\3#"
 done
 render() { # <output name> <values files...>
   out=$1; shift
