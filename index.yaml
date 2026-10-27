@@ -185,6 +185,36 @@ entries:
   - annotations:
       artifacthub.io/license: Apache-2.0
     apiVersion: v2
+    created: "2026-10-27T15:49:26.810527634Z"
+    dependencies:
+    - name: common
+      repository: https://bjw-s-labs.github.io/helm-charts
+      version: 5.3.0
+    description: 'Ghost''s application chart: the bjw-s common library plus optional
+      External Secrets injection (app-secrets / app-db-secrets) and git-sync hot reload
+      for PR previews. A drop-in replacement for bjw-s app-template.'
+    digest: 2c747f067bf560d40a4f2009613783da9be11198da23b99af7532b14c171c84e
+    home: https://github.com/TryGhost/pro-helm-charts
+    keywords:
+    - ghost
+    - app-template
+    - external-secrets
+    - git-sync
+    kubeVersion: '>=1.28.0-0'
+    maintainers:
+    - name: Ghost Foundation
+      url: https://github.com/TryGhost
+    name: k8s-app
+    sources:
+    - https://github.com/TryGhost/pro-helm-charts
+    - https://github.com/bjw-s-labs/helm-charts
+    type: application
+    urls:
+    - https://github.com/TryGhost/pro-helm-charts/releases/download/k8s-app-0.11.3/k8s-app-0.11.3.tgz
+    version: 0.11.3
+  - annotations:
+      artifacthub.io/license: Apache-2.0
+    apiVersion: v2
     created: "2026-10-27T15:45:46.201981635Z"
     dependencies:
     - name: common
@@ -632,4 +662,4 @@ entries:
     urls:
     - https://github.com/TryGhost/pro-helm-charts/releases/download/k8s-app-0.4.0/k8s-app-0.4.0.tgz
     version: 0.4.0
-generated: "2026-10-27T15:45:46.193913395Z"
+generated: "2026-10-27T15:49:26.801787426Z"
