@@ -47,7 +47,7 @@ spec:
   template:
     spec:
       restartPolicy: Never
-      {{- with (include "k8s-app.preview.priorityClassName" $) }}
+      {{- with (include "k8s-app.priorityClassName" (dict "ctx" $ "job" true)) }}
       priorityClassName: {{ . }}
       {{- end }}
       containers:

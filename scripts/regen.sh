@@ -8,9 +8,12 @@
 #   charts/k8s-app/tests/snapshots/    helm template of examples/k8s-app per
 #                                      environment, documents sorted by kind +
 #                                      name, minus the helm.sh/chart label so
-#                                      version bumps don't touch every snapshot
+#                                      version bumps don't touch every snapshot,
+#                                      and chart-default image tags replaced by
+#                                      __DEFAULT_TAG__ so Renovate image bumps
+#                                      don't either
 #
-# Needs: helm (with the bjw-s repo added), jq.
+# Needs: helm (with the bjw-s repo added), jq, yq.
 set -eu
 cd "$(dirname "$0")/.."
 CHART=charts/k8s-app
@@ -45,6 +48,20 @@ done < "$md"
 mv "$out" "$md"
 
 EX=examples/k8s-app
+# Chart-default images: every repository + tag map in values.yaml, so a new
+# image is masked without touching this script. Only the default is masked: an
+# image an example overrides still shows in full. '#' is the sed delimiter as
+# it can't appear in an image reference.
+esc() { printf '%s' "$1" | sed 's/[][\\.*^$]/\\&/g'; }
+default_tags=""
+nl='
+'
+for img in $(yq '.. | select(tag == "!!map" and has("repository") and has("tag")) | path | "." + join(".")' "$CHART/values.yaml"); do
+  repo=$(yq "$img.repository" "$CHART/values.yaml")
+  tag=$(yq "$img.tag" "$CHART/values.yaml")
+  # image: repo:tag, optionally as a list item's first key and/or quoted
+  default_tags="$default_tags${nl}s#^\\([[:space:]]*\\(- \\)\\{0,1\\}image:[[:space:]]*[\"']\\{0,1\\}$(esc "$repo")\\):$(esc "$tag")\\([\"']\\{0,1\\}\\)\$#\\1:__DEFAULT_TAG__\\3#"
+done
 render() { # <output name> <values files...>
   out=$1; shift
   # documents sorted by kind + name: the library's own emission order is not
@@ -52,7 +69,8 @@ render() { # <output name> <values files...>
   helm template myapp "$CHART" -n myapp -f "$EX/values.base.yaml" "$@" \
     | grep -v '^# Source: ' \
     | yq ea 'select(. != null) as $d ireduce ([]; . + [$d]) | sort_by(.kind, .metadata.name) | .[] | split_doc' \
-    | grep -v '^\s*helm.sh/chart: ' > "$CHART/tests/snapshots/$out.yaml"
+    | grep -v '^\s*helm.sh/chart: ' \
+    | sed "$default_tags" > "$CHART/tests/snapshots/$out.yaml"
 }
 for env in staging production; do
   render "$env" -f "$EX/values.$env.yaml"

@@ -83,7 +83,7 @@
         "helm-values"
       ],
       "prBodyNotes": [
-        "Bump `version` in `charts/k8s-app/Chart.yaml` (patch), run `scripts/regen.sh` and commit the updated snapshots before merging; CI enforces both. Renovate cannot do either for values.yaml changes."
+        "Bump `version` in `charts/k8s-app/Chart.yaml` (patch) before merging; CI enforces it and Renovate cannot bump it for values.yaml changes. No `scripts/regen.sh` needed: snapshots mask chart-default image tags as `__DEFAULT_TAG__`."
       ],
       "pinDigests": false
     },

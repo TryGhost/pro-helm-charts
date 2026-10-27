@@ -16069,7 +16069,7 @@
                 "tag": {
                   "type": "string",
                   "minLength": 1,
-                  "default": "v4.4.2"
+                  "description": "Default in values.yaml (kept current by Renovate)."
                 }
               },
               "required": [
@@ -16223,7 +16223,7 @@
             "tag": {
               "type": "string",
               "minLength": 1,
-              "default": "26.7"
+              "description": "Default in values.yaml (kept current by Renovate)."
             }
           },
           "required": [
@@ -16302,7 +16302,7 @@
           "default": "TryGhost"
         },
         "priorityClassName": {
-          "description": "PriorityClass given to every preview pod unless defaultPodOptions.priorityClassName is set, so previews are preempted first. Cluster-scoped, created by terraform (pro-infra) on staging only; must exist.",
+          "description": "PriorityClass given to the long-running pods (Deployments, StatefulSets, DaemonSets) of a PR preview unless defaultPodOptions.priorityClassName is set, so previews are preempted first. Jobs and CronJobs (migrations, preview database, job/cronjob controllers) keep the default priority. Cluster-scoped, created by terraform (pro-infra) on staging only; must exist.",
           "type": "string",
           "default": "preview"
         }

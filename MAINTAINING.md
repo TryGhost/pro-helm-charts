@@ -23,7 +23,7 @@ chart change and commit the result; CI runs it and fails on a dirty tree.
 |---|---|
 | `charts/k8s-app/values.schema.json` | common's schema (from the locked archive) + `schemas/k8s-app.json` |
 | `charts/k8s-app/README.md` values tables | `values.schema.json`, spliced between the `<!-- values: ... -->` markers by `scripts/values-reference.jq` |
-| `charts/k8s-app/tests/snapshots/{staging,production,preview}.yaml` | `helm template` of `examples/k8s-app` per environment, documents sorted by kind and name (the library's emission order is not stable), minus the `helm.sh/chart` label so version bumps don't churn them |
+| `charts/k8s-app/tests/snapshots/{staging,production,preview}.yaml` | `helm template` of `examples/k8s-app` per environment, documents sorted by kind and name (the library's emission order is not stable), minus the `helm.sh/chart` label so version bumps don't churn them, and with the tag of every chart-default image in `values.yaml` masked as `__DEFAULT_TAG__` so Renovate image bumps don't either (CI checks the real tags render and that the snapshots stay masked) |
 
 The prose in `charts/k8s-app/README.md` is hand-written; only the tables
 between markers are regenerated. Options k8s-app adds are documented in

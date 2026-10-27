@@ -1001,7 +1001,7 @@ The pull-request ApplicationSet passes `preview.prNumber` as a Helm parameter
 (`k8s-app.preview.prNumber={{.number}}` on the umbrella chart); it drives the
 injected `GITHUB_PR_NUMBER` env var, the `pull-request` pod label,
 `hotReload`'s git ref and `previewDatabase`'s database name, and gives every
-preview pod the low `preview.priorityClassName`. `preview.gitRepo`
+long-running preview pod the low `preview.priorityClassName`. `preview.gitRepo`
 is derived from `preview.owner` and the release namespace (app name ==
 namespace == repository name by convention) and only needs setting when the
 repository name differs from the slug (`Daisy.js` vs `daisy-js`). Outside
@@ -1014,7 +1014,7 @@ previews the group is empty and nothing preview-specific renders.
 | `preview.gitRepo` | string | `""` | SSH clone URL for hotReload. Empty = git@github.com:<owner>/<release namespace>.git. |
 | `preview.owner` | string | `"TryGhost"` | GitHub owner used when deriving gitRepo. |
 | `preview.prNumber` | string / integer | `""` | Pull request number (render-time literal). |
-| `preview.priorityClassName` | string | `"preview"` | PriorityClass given to every preview pod unless defaultPodOptions.priorityClassName is set, so previews are preempted first. Cluster-scoped, created by terraform (pro-infra) on staging only; must exist. |
+| `preview.priorityClassName` | string | `"preview"` | PriorityClass given to the long-running pods (Deployments, StatefulSets, DaemonSets) of a PR preview unless defaultPodOptions.priorityClassName is set, so previews are preempted first. Jobs and CronJobs (migrations, preview database, job/cronjob controllers) keep the default priority. Cluster-scoped, created by terraform (pro-infra) on staging only; must exist. |
 <!-- /values -->
 
 ## k8s-app: secret injection `secretsInjection`
@@ -1214,7 +1214,7 @@ Example: [`examples/k8s-app/values.preview.yaml`](../../examples/k8s-app/values.
 | `hotReload.gitSync.gid` | integer | `65533` | gid git-sync runs as; also the pod fsGroup so the mounted SSH key is readable. |
 | `hotReload.gitSync.image` | object |  | git-sync image (repository + tag). |
 | `hotReload.gitSync.image.repository` | string | `"registry.k8s.io/git-sync/git-sync"` |  |
-| `hotReload.gitSync.image.tag` | string | `"v4.4.2"` |  |
+| `hotReload.gitSync.image.tag` | string |  | Default in values.yaml (kept current by Renovate). |
 | `hotReload.gitSync.link` | string | `"app"` | Symlink name under root that git-sync publishes atomically (--link). |
 | `hotReload.gitSync.period` | string | `"2s"` | Polling interval for the sidecar. |
 | `hotReload.gitSync.resources` | object |  | Resources for both git-sync containers. |
@@ -1234,8 +1234,9 @@ Example: [`examples/k8s-app/values.preview.yaml`](../../examples/k8s-app/values.
 
 Gives each PR preview its own MySQL database on the app's managed cluster.
 Two Jobs named `<release>-create-preview-db` and `<release>-drop-preview-db`
-run `mysql:26.7` with `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASS` from the
-`app-db-secrets` Secret (so it pairs with `secretsInjection.database: true`),
+run the `previewDatabase.image` MySQL client with
+`DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASS` from the `app-db-secrets` Secret
+(so it pairs with `secretsInjection.database: true`),
 `APP_NAME` (the namespace) and `GITHUB_PR_NUMBER` (`preview.prNumber`). The
 database is `<namespace>_preview_<pr>`; a shell guard refuses a non-numeric
 PR number.
@@ -1273,7 +1274,7 @@ controllers:
 | `previewDatabase.enabled` | boolean | `false` | Create the per-PR database Jobs. |
 | `previewDatabase.image` | object |  | MySQL client image used by both Jobs. |
 | `previewDatabase.image.repository` | string | `"mysql"` |  |
-| `previewDatabase.image.tag` | string | `"26.7"` |  |
+| `previewDatabase.image.tag` | string |  | Default in values.yaml (kept current by Renovate). |
 | `previewDatabase.keys` | object |  | Keys inside secretName holding host, port, user and password. |
 | `previewDatabase.keys.host` | string | `"host"` |  |
 | `previewDatabase.keys.password` | string | `"password"` |  |
@@ -1361,11 +1362,15 @@ configuration; it selects nothing by itself:
   wins.
 - **`pull-request` pod label** from `preview.prNumber`, for `kubectl -l` and
   log correlation.
-- **`priorityClassName: preview`** (`preview.priorityClassName`) on every pod
-  of a PR preview, including the preview database Jobs, so other apps' pods
-  preempt previews when a node is full. Unless
-  `defaultPodOptions.priorityClassName` is set; a controller's
-  `pod.priorityClassName` wins as usual. Nothing is set outside previews.
+- **`priorityClassName: preview`** (`preview.priorityClassName`) on the
+  Deployments, StatefulSets and DaemonSets of a PR preview, so other apps'
+  pods preempt previews when a node is full. Jobs (migrations, preview
+  database create/drop, and `type: job`/`cronjob` controllers) keep the
+  default priority: a preemption would count
+  against `backoffLimit`, and the PostDelete drop Job must not depend on the
+  PriorityClass existing at teardown. A controller's `pod.priorityClassName`
+  wins, and a set `defaultPodOptions.priorityClassName` applies to every pod,
+  Jobs included. Nothing is set outside previews.
 - **`imagePullSecrets`**: `[{name: ghost}]` unless `defaultPodOptions.imagePullSecrets`
   is set. DOKS keeps that secret in every namespace but only attaches it to
   the default ServiceAccount, and the chart uses its own.
@@ -1461,3 +1466,12 @@ when other apps need the room. The PriorityClass is cluster-scoped and
 created by terraform (pro-infra) on staging only, where previews run; a
 preview rendered with this version on any other cluster has its pods
 rejected by the API server.
+
+### 0.11.1
+
+Preview Jobs (migrations, preview database create/drop) no longer get the
+`preview` PriorityClass: preempting them failed the Job after `backoffLimit`
+retries, and the drop hook depended on the class at teardown. The preview
+database Jobs now honour `defaultPodOptions.priorityClassName`, as documented.
+Image bumps no longer touch the snapshots (chart-default tags render as
+`__DEFAULT_TAG__`).
