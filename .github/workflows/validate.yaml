@@ -176,7 +176,8 @@ jobs:
             [ "$got" = "$repo:$(yq "$p.tag" "$CHART/values.yaml")" ]
             [ "$(img "$p" --set "${p#.}.tag=override")" = "$repo:override" ]
             grep -qF "image: $repo:__DEFAULT_TAG__" "$CHART/tests/snapshots/preview.yaml"
-            ! grep -qF "$got" "$CHART"/tests/snapshots/*.yaml || exit 1  # a bare ! never trips set -e
+            # whole image lines only: a longer tag (26.7.1 vs 26.7) is not the default
+            ! grep -qxE "[[:space:]]*(- )?image:[[:space:]]*[\"']?${got//./\\.}[\"']?" "$CHART"/tests/snapshots/*.yaml || exit 1  # a bare ! never trips set -e
           done
 
   version-bump:

@@ -1014,7 +1014,7 @@ previews the group is empty and nothing preview-specific renders.
 | `preview.gitRepo` | string | `""` | SSH clone URL for hotReload. Empty = git@github.com:<owner>/<release namespace>.git. |
 | `preview.owner` | string | `"TryGhost"` | GitHub owner used when deriving gitRepo. |
 | `preview.prNumber` | string / integer | `""` | Pull request number (render-time literal). |
-| `preview.priorityClassName` | string | `"preview"` | PriorityClass given to the long-running pods (Deployments, StatefulSets, DaemonSets) of a PR preview unless defaultPodOptions.priorityClassName is set, so previews are preempted first. Jobs keep the default priority. Cluster-scoped, created by terraform (pro-infra) on staging only; must exist. |
+| `preview.priorityClassName` | string | `"preview"` | PriorityClass given to the long-running pods (Deployments, StatefulSets, DaemonSets) of a PR preview unless defaultPodOptions.priorityClassName is set, so previews are preempted first. Jobs and CronJobs (migrations, preview database, job/cronjob controllers) keep the default priority. Cluster-scoped, created by terraform (pro-infra) on staging only; must exist. |
 <!-- /values -->
 
 ## k8s-app: secret injection `secretsInjection`
@@ -1365,7 +1365,8 @@ configuration; it selects nothing by itself:
 - **`priorityClassName: preview`** (`preview.priorityClassName`) on the
   Deployments, StatefulSets and DaemonSets of a PR preview, so other apps'
   pods preempt previews when a node is full. Jobs (migrations, preview
-  database create/drop) keep the default priority: a preemption would count
+  database create/drop, and `type: job`/`cronjob` controllers) keep the
+  default priority: a preemption would count
   against `backoffLimit`, and the PostDelete drop Job must not depend on the
   PriorityClass existing at teardown. A controller's `pod.priorityClassName`
   wins, and a set `defaultPodOptions.priorityClassName` applies to every pod,
