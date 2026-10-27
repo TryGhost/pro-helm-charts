@@ -55,18 +55,18 @@ jobs:
         run: |
           set -x
           base="-f $EX/values.base.yaml"
-          ! helm template t "$CHART" $base --set secretsInjection.bogus=1
-          ! helm template t "$CHART" $base --set secretsInjection.store.kind=Nope
-          ! helm template t "$CHART" $base --set hotReload.enabled=true --set hotReload.controller=nope  # unknown controller
-          ! helm template t "$CHART" $base --set controllers.main.bogus=1  # bjw-s schema still applies
-          ! helm template t "$CHART" $base --set previewDatabase.bogus=1
-          ! helm template t "$CHART" $base --set previewDatabase.backoffLimit=-1
-          ! helm template t "$CHART" $base --set route.main.gateway=bogus  # selector is an enum
-          ! helm template t "$CHART" $base --set gateway.bogus=1
-          ! helm template t "$CHART" $base --set migrations.bogus=1
-          ! helm template t "$CHART" $base --set migrations.backoffLimit=-1
-          ! helm template t "$CHART" $base --set migrations.enabled=true --set migrations.command=null   # command is required
-          ! helm template t "$CHART" $base --set migrations.container=nope   # unknown container
+          ! helm template t "$CHART" $base --set secretsInjection.bogus=1 || exit 1
+          ! helm template t "$CHART" $base --set secretsInjection.store.kind=Nope || exit 1
+          ! helm template t "$CHART" $base --set hotReload.enabled=true --set hotReload.controller=nope || exit 1  # unknown controller
+          ! helm template t "$CHART" $base --set controllers.main.bogus=1 || exit 1  # bjw-s schema still applies
+          ! helm template t "$CHART" $base --set previewDatabase.bogus=1 || exit 1
+          ! helm template t "$CHART" $base --set previewDatabase.backoffLimit=-1 || exit 1
+          ! helm template t "$CHART" $base --set route.main.gateway=bogus || exit 1  # selector is an enum
+          ! helm template t "$CHART" $base --set gateway.bogus=1 || exit 1
+          ! helm template t "$CHART" $base --set migrations.bogus=1 || exit 1
+          ! helm template t "$CHART" $base --set migrations.backoffLimit=-1 || exit 1
+          ! helm template t "$CHART" $base --set migrations.enabled=true --set migrations.command=null || exit 1   # command is required
+          ! helm template t "$CHART" $base --set migrations.container=nope || exit 1   # unknown container
 
       - name: Derived files are up to date (schema + rendered snapshots)
         # scripts/regen.sh rebuilds values.schema.json, the README values tables and tests/snapshots/;
@@ -89,11 +89,11 @@ jobs:
           set -euo pipefail
           r="$CHART/tests/snapshots"
           echo "no Kustomize placeholder survives; ESO expressions reach the manifest untouched"
-          ! grep -rq REPLACED-BY-KUSTOMIZE "$r"
+          ! grep -rq REPLACED-BY-KUSTOMIZE "$r" || exit 1
           grep -q "host: '{{ (.db | fromJson).private_host }}'" "$r/staging.yaml"
           echo "secretsInjection is opt-in and injects nothing: disabled renders no ExternalSecret, enabled adds no envFrom"
-          ! helm template t "$CHART" -f "$EX/values.base.yaml" --set secretsInjection.enabled=false --set secretsInjection.database=false | grep -q 'kind: ExternalSecret'
-          ! helm template t "$CHART" -f "$EX/values.base.yaml" --set secretsInjection.database=false | grep -q 'name: app-db-secrets$'
+          ! helm template t "$CHART" -f "$EX/values.base.yaml" --set secretsInjection.enabled=false --set secretsInjection.database=false | grep -q 'kind: ExternalSecret' || exit 1
+          ! helm template t "$CHART" -f "$EX/values.base.yaml" --set secretsInjection.database=false | grep -q 'name: app-db-secrets$' || exit 1
           [ "$(yq 'select(.kind=="Deployment") | .spec.template.spec.containers[0].envFrom[] | select(.secretRef != null) | .secretRef.name' "$r/staging.yaml")" = "" ]
           echo "hot reload leaves the app container's env alone and touches only its command/args"
           [ "$(yq 'select(.kind=="Deployment") | .spec.template.spec.containers[] | select(.name=="main") | .env[] | select(.name=="db__connection__database") | .value' "$r/preview.yaml")" = '$(APP_NAME)_preview_$(GITHUB_PR_NUMBER)' ]
@@ -103,7 +103,7 @@ jobs:
           [ "$(yq '.[] | select(.name=="db__connection__host") | .valueFrom.secretKeyRef.key' <<<"$m")" = "host" ]
           [ "$(yq '.[] | select(.name=="db__client") | .value' <<<"$m")" = "mysql2" ]
           [ "$(yq '.[] | select(.name=="db__connection__database") | .value' <<<"$m")" = "myapp" ]
-          ! helm template t "$CHART" -f "$EX/values.base.yaml" -f "$EX/values.staging.yaml" --set secretsInjection.database=false | grep -q 'db__connection__host'
+          ! helm template t "$CHART" -f "$EX/values.base.yaml" -f "$EX/values.staging.yaml" --set secretsInjection.database=false | grep -q 'db__connection__host' || exit 1
           echo "the migrations Job is the app's container with command replaced, ordered before the workloads"
           j=$(yq 'select(.kind=="Job" and .metadata.name=="myapp-migrations")' "$r/preview.yaml")
           d=$(yq 'select(.kind=="Deployment") | .spec.template.spec.containers[] | select(.name=="main")' "$r/preview.yaml")
@@ -155,7 +155,7 @@ jobs:
           yq 'select(.kind=="Certificate") | .spec.dnsNames[0]' <<<"$d" | grep -qx myapp.ghostinfra.net
           yq 'select(.kind=="HTTPRoute" and .metadata.name=="myapp-gateway-external-https-redirect") | .spec.rules[0].filters[0].type' <<<"$d" | grep -qx RequestRedirect
           yq 'select(.kind=="HTTPRoute" and .metadata.name=="myapp") | .spec.parentRefs[0].name' <<<"$d" | grep -qx myapp-gateway-external
-          ! helm template myapp "$CHART" -n myapp -f "$EX/values.base.yaml" -f "$EX/values.preview.yaml" --set preview.prNumber=123 --set route.main.gateway=dedicated-internal
+          ! helm template myapp "$CHART" -n myapp -f "$EX/values.base.yaml" -f "$EX/values.preview.yaml" --set preview.prNumber=123 --set route.main.gateway=dedicated-internal || exit 1
           echo "chart-default images (every repository + tag in values.yaml) render the default, are masked as __DEFAULT_TAG__ in the snapshots, and an override wins"
           img() { # <values.yaml image path> [helm args...]: the rendered images of the containers using it
             case "$1" in
