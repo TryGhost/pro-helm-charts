@@ -141,11 +141,14 @@ jobs:
               | yq 'select(.kind=="Job" and .metadata.name=="myapp-create-preview-db") | .spec.template.spec.containers[0].env')
           [ "$(yq '.[] | select(.name=="DB_USER") | .valueFrom.secretKeyRef.name' <<<"$c")" = "other-db" ]
           [ "$(yq '.[] | select(.name=="DB_PASS") | .valueFrom.secretKeyRef.key' <<<"$c")" = "pw" ]
-          echo "preview pods (workloads and preview database Jobs) get the preview PriorityClass; nothing outside previews; an explicit one wins"
-          [ "$(yq 'select(.kind=="Deployment" or .kind=="Job") | .spec.template.spec.priorityClassName' "$r/preview.yaml" | grep -v '^---$' | sort -u)" = "preview" ]
+          echo "preview workloads get the preview PriorityClass, Jobs keep the default; nothing outside previews; an explicit one wins everywhere"
+          [ "$(yq 'select(.kind=="Deployment") | .spec.template.spec.priorityClassName' "$r/preview.yaml")" = "preview" ]
+          [ "$(yq 'select(.kind=="Job") | .spec.template.spec.priorityClassName // "unset"' "$r/preview.yaml" | grep -v '^---$' | sort -u)" = "unset" ]
           [ "$(yq 'select(.kind=="Deployment") | .spec.template.spec.priorityClassName // "unset"' "$r/staging.yaml")" = "unset" ]
           [ "$(helm template myapp "$CHART" -n myapp -f "$EX/values.base.yaml" -f "$EX/values.preview.yaml" --set preview.prNumber=123 --set defaultPodOptions.priorityClassName=other \
-               | yq 'select(.kind=="Deployment") | .spec.template.spec.priorityClassName')" = "other" ]
+               | yq 'select(.kind=="Deployment" or .kind=="Job") | .spec.template.spec.priorityClassName' | grep -v '^---$' | sort -u)" = "other" ]
+          [ "$(helm template myapp "$CHART" -n myapp -f "$EX/values.base.yaml" -f "$EX/values.preview.yaml" --set preview.prNumber=123 --set controllers.main.pod.priorityClassName=mine \
+               | yq 'select(.kind=="Deployment") | .spec.template.spec.priorityClassName')" = "mine" ]
           echo "route parentRefs are filled from the gateway selector (shared-internal default in the snapshots)"
           [ "$(yq 'select(.kind=="HTTPRoute") | .spec.parentRefs[0].name' "$r/staging.yaml")" = "shared-internal-gateway" ]
           echo "dedicated gateways render Gateway + Certificate + redirect, and are refused on previews"

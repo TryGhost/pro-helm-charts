@@ -385,7 +385,6 @@ spec:
   template:
     spec:
       restartPolicy: Never
-      priorityClassName: preview
       containers:
         - name: create
           image: mysql:__DEFAULT_TAG__
@@ -440,7 +439,6 @@ spec:
   template:
     spec:
       restartPolicy: Never
-      priorityClassName: preview
       containers:
         - name: drop
           image: mysql:__DEFAULT_TAG__
@@ -508,7 +506,6 @@ spec:
       enableServiceLinks: false
       serviceAccountName: myapp
       automountServiceAccountToken: false
-      priorityClassName: preview
       securityContext:
         fsGroup: 65533
       hostIPC: false

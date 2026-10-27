@@ -9,10 +9,28 @@ to RollingUpdate instead. User-declared strategy always wins.
 */}}
 {{- define "k8s-app.controllerDefaults.values" -}}
 {{- $ctrls := dict -}}
+{{- /* Previews are the first to go when a node is full: a low PriorityClass
+       on each long-running preview controller lets other apps' pods preempt
+       them. Per controller rather than defaultPodOptions so Jobs (migrations)
+       stay out of it; see k8s-app.priorityClassName. A controller's own
+       pod.priorityClassName or a user-set defaultPodOptions one wins (the
+       latter is applied by the library itself). */ -}}
+{{- $previewClass := "" -}}
+{{- if not (dig "priorityClassName" "" (.Values.defaultPodOptions | default dict)) -}}
+  {{- $previewClass = include "k8s-app.priorityClassName" (dict "ctx" . "job" false) -}}
+{{- end -}}
 {{- range $cName, $c := (.Values.controllers | default dict) -}}
-  {{- $type := (get ($c | default dict) "type") | default "deployment" -}}
-  {{- if and (has $type (list "deployment" "statefulset")) (not (hasKey ($c | default dict) "strategy")) -}}
-    {{- $_ := set $ctrls $cName (dict "strategy" "RollingUpdate") -}}
+  {{- $c = $c | default dict -}}
+  {{- $type := (get $c "type") | default "deployment" -}}
+  {{- $d := dict -}}
+  {{- if and (has $type (list "deployment" "statefulset")) (not (hasKey $c "strategy")) -}}
+    {{- $_ := set $d "strategy" "RollingUpdate" -}}
+  {{- end -}}
+  {{- if and $previewClass (has $type (list "deployment" "statefulset" "daemonset")) (not (dig "pod" "priorityClassName" "" $c)) -}}
+    {{- $_ := set $d "pod" (dict "priorityClassName" $previewClass) -}}
+  {{- end -}}
+  {{- if $d -}}
+    {{- $_ := set $ctrls $cName $d -}}
   {{- end -}}
 {{- end -}}
 {{- $out := dict "controllers" $ctrls -}}
@@ -21,15 +39,6 @@ to RollingUpdate instead. User-declared strategy always wins.
        and log correlation (user labels are deep-merged, so this only adds) */ -}}
 {{- if .Values.preview.prNumber -}}
   {{- $_ := set $dpo "labels" (dict "pull-request" (.Values.preview.prNumber | toString)) -}}
-{{- end -}}
-{{- /* Previews are the first to go when a node is full: a low PriorityClass
-       lets other apps' pods preempt them. A user-set
-       defaultPodOptions.priorityClassName wins (per-controller
-       pod.priorityClassName already overrides defaultPodOptions). */ -}}
-{{- with (include "k8s-app.preview.priorityClassName" .) -}}
-  {{- if not (dig "priorityClassName" "" ($.Values.defaultPodOptions | default dict)) -}}
-    {{- $_ := set $dpo "priorityClassName" . -}}
-  {{- end -}}
 {{- end -}}
 {{- /* DO's DOKS registry integration maintains the `ghost` pull secret in
        every namespace but only attaches it to the default ServiceAccount;

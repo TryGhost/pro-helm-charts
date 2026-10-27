@@ -21,11 +21,20 @@ verbatim. Usage: {{ include "k8s-app.esoField" "private_host" }}
 {{- end -}}
 
 {{/*
-PriorityClass for preview pods: preview.priorityClassName on PR previews,
-empty otherwise.
+PriorityClass for a pod the chart emits, the one place the precedence lives:
+a user-set defaultPodOptions.priorityClassName always wins; otherwise
+long-running preview workloads get preview.priorityClassName and everything
+else (Jobs, non-preview pods) gets none. Jobs stay out of the low class:
+a preemption counts against backoffLimit (bjw-s cannot set podFailurePolicy
+on the migrations Job), and the PostDelete drop Job must not depend on a
+cluster-scoped PriorityClass existing at teardown.
+Usage: {{ include "k8s-app.priorityClassName" (dict "ctx" $ "job" true) }}
 */}}
-{{- define "k8s-app.preview.priorityClassName" -}}
-{{- if .Values.preview.prNumber -}}
-{{- .Values.preview.priorityClassName -}}
+{{- define "k8s-app.priorityClassName" -}}
+{{- $user := dig "priorityClassName" "" (.ctx.Values.defaultPodOptions | default dict) -}}
+{{- if $user -}}
+{{- $user -}}
+{{- else if and (not .job) .ctx.Values.preview.prNumber -}}
+{{- .ctx.Values.preview.priorityClassName -}}
 {{- end -}}
 {{- end -}}
