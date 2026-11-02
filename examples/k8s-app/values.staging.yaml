@@ -19,3 +19,16 @@ route:
   main:
     hostnames:
       - myapp.ghostinfra.net
+
+monitoring:
+  alerts:
+    MyappHighErrorRate:
+      labels:
+        severity: warning
+  slos:
+    availability:
+      alerting:
+        severities:
+          fastBurn: warning
+          mediumBurn: warning
+          absent: warning

@@ -38,6 +38,7 @@ Contents
 - [k8s-app: migrations `migrations`](#k8s-app-migrations-migrations)
 - [k8s-app: hot reload `hotReload`](#k8s-app-hot-reload-hotreload)
 - [k8s-app: preview database `previewDatabase`](#k8s-app-preview-database-previewdatabase)
+- [k8s-app: alerting `monitoring`](#k8s-app-alerting-monitoring)
 - [k8s-app: defaults applied to every release](#k8s-app-defaults-applied-to-every-release)
 - [Upgrading](#upgrading)
 
@@ -61,7 +62,7 @@ version: 0.0.0
 dependencies:
   - name: k8s-app
     repository: https://tryghost.github.io/pro-helm-charts
-    version: 0.10.1
+    version: 0.12.0
 ```
 
 ```yaml
@@ -1349,6 +1350,65 @@ configuration; it selects nothing by itself:
 | `gateway.shared.internal` | object |  | The shared internal (VPC-only) Gateway. |
 | `gateway.shared.internal.name` | string | `"shared-internal-gateway"` | Name of the shared internal (VPC-only) Gateway. |
 | `gateway.shared.internal.namespace` | string | `"default"` | Namespace it lives in. |
+<!-- /values -->
+
+## k8s-app: alerting `monitoring`
+
+- `monitoring.alerts`: Prometheus alerting rules keyed by alert name, rendered
+  into one PrometheusRule `<release>-alerts`. `expr` and `annotations` are
+  emitted verbatim, so `{{ $labels.x }}` and `{{ $value }}` work.
+- `monitoring.slos`: one Pyrra `ServiceLevelObjective` `<release>-<id>` per
+  key; Pyrra generates the recording and burn-rate alerting rules. Needs Pyrra
+  installed in the cluster.
+- Keyed maps, so a `values.<env>.yaml` can tune or disable (`enabled: false`)
+  a single entry. Nothing renders on PR previews.
+
+```yaml
+monitoring:
+  alerts:
+    MyappDown:
+      expr: up{job="myapp"} == 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "{{ $labels.pod }} is down"
+  slos:
+    availability:
+      target: "99.9"
+      window: 4w
+      indicator:
+        ratio:
+          errors:
+            metric: http_requests_total{job="myapp",code=~"5.."}
+          total:
+            metric: http_requests_total{job="myapp"}
+```
+
+<!-- values: monitoring -->
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `monitoring` | object |  | Alerting: Prometheus alerting rules and Pyrra SLOs. Keyed maps so an environment can override or disable a single entry. Nothing renders on PR previews. |
+| `monitoring.alerts` | object | `{}` | Prometheus alerting rules keyed by alert name, rendered into one PrometheusRule <release>-alerts (one rule group named after the release). |
+| `monitoring.alerts.<id>.annotations` | object |  | Annotations such as summary and description. Prometheus templating ({{ $labels.x }}, {{ $value }}) passes through. |
+| `monitoring.alerts.<id>.enabled` | boolean | `true` | Render this alert. |
+| `monitoring.alerts.<id>.expr` | string |  | PromQL expression; the alert fires for every series it returns. Emitted verbatim. |
+| `monitoring.alerts.<id>.for` | string |  | How long expr must hold before the alert fires. |
+| `monitoring.alerts.<id>.keepFiringFor` | string |  | How long the alert keeps firing after expr stops returning (keep_firing_for). |
+| `monitoring.alerts.<id>.labels` | object |  | Labels added to the alert, e.g. severity. |
+| `monitoring.slos` | object | `{}` | Pyrra ServiceLevelObjectives keyed by id, each rendered as <release>-<id>. Requires the Pyrra operator (pyrra.dev/v1alpha1 CRD) in the cluster. |
+| `monitoring.slos.<id>.alerting` | object |  | Pyrra alerting settings (name, absentName, disabled, burnrates, absent, severities), passed through verbatim. Default: multi-window burn-rate alerts named ErrorBudgetBurn, critical for fast and medium burn and absent metrics, warning for slow burn. |
+| `monitoring.slos.<id>.annotations` | object |  | Annotations on the ServiceLevelObjective. |
+| `monitoring.slos.<id>.description` | string |  | Human-readable description shown in Pyrra. |
+| `monitoring.slos.<id>.enabled` | boolean | `true` | Render this SLO. |
+| `monitoring.slos.<id>.indicator` | object |  | Pyrra indicator, exactly one of ratio, latency, latencyNative or bool_gauge, passed through verbatim. https://github.com/pyrra-dev/pyrra#kubernetes |
+| `monitoring.slos.<id>.indicator.bool_gauge` | object |  | A 0/1 gauge: metric (PromQL selector). |
+| `monitoring.slos.<id>.indicator.latency` | object |  | Fraction of requests under a histogram bucket: success.metric (the le bucket) and total.metric. |
+| `monitoring.slos.<id>.indicator.latencyNative` | object |  | Fraction of requests under latency on a native histogram: latency (a duration) and total.metric. |
+| `monitoring.slos.<id>.indicator.ratio` | object |  | Errors over total: errors.metric and total.metric (PromQL selectors). |
+| `monitoring.slos.<id>.labels` | object |  | Extra labels on the ServiceLevelObjective. Pyrra copies labels prefixed pyrra.dev/ (prefix stripped) onto the alerts it generates, e.g. pyrra.dev/team (set severity through alerting.severities). |
+| `monitoring.slos.<id>.target` | string / number |  | Objective in percent, e.g. "99.9". |
+| `monitoring.slos.<id>.window` | string | `"4w"` | Rolling window the objective is measured over. |
 <!-- /values -->
 
 ## k8s-app: defaults applied to every release
