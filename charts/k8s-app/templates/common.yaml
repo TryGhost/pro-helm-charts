@@ -17,9 +17,11 @@ global:
 {{- end -}}
 {{- $_ := mergeOverwrite .Values (include "k8s-app.hardcodedValues" . | fromYaml) -}}
 
-{{- /* The library runs every value string through tpl; monitoring carries
-Prometheus templating ({{ $labels.x }}, {{ $value }}) that must reach
-Prometheus verbatim. Appended, so an app's own excludePaths are kept. */ -}}
+{{- /* The library runs every value string (of a copy of .Values) through tpl;
+monitoring carries Prometheus templating ({{ $labels.x }}, {{ $value }})
+that tpl would fail on (undefined variable). monitoring.yaml reads the raw
+.Values, so it emits them verbatim. Appended, so an app's own excludePaths
+are kept. */ -}}
 {{- $evaluation := dig "templateEvaluation" dict .Values.global -}}
 {{- $excludePaths := append (dig "excludePaths" list $evaluation) (list "monitoring") -}}
 {{- $_ := set .Values.global "templateEvaluation" (merge (dict "excludePaths" $excludePaths) $evaluation) -}}
