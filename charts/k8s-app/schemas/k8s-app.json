@@ -488,6 +488,161 @@
       "dedicated"
     ]
   },
+  "monitoring": {
+    "description": "Alerting: Prometheus alerting rules and Pyrra SLOs. Keyed maps so an environment can override or disable a single entry. Nothing renders on PR previews.",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "alerts": {
+        "description": "Prometheus alerting rules keyed by alert name, rendered into one PrometheusRule <release>-alerts (one rule group named after the release).",
+        "type": "object",
+        "default": {},
+        "propertyNames": {
+          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+        },
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "description": "Render this alert.",
+              "type": "boolean",
+              "default": true
+            },
+            "expr": {
+              "description": "PromQL expression; the alert fires for every series it returns. Emitted verbatim.",
+              "type": "string",
+              "minLength": 1
+            },
+            "for": {
+              "description": "How long expr must hold before the alert fires.",
+              "type": "string",
+              "pattern": "^([0-9]+(ms|s|m|h|d|w|y))+$"
+            },
+            "keepFiringFor": {
+              "description": "How long the alert keeps firing after expr stops returning (keep_firing_for).",
+              "type": "string",
+              "pattern": "^([0-9]+(ms|s|m|h|d|w|y))+$"
+            },
+            "labels": {
+              "description": "Labels added to the alert, e.g. severity.",
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "annotations": {
+              "description": "Annotations such as summary and description. Prometheus templating ({{ $labels.x }}, {{ $value }}) passes through.",
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "expr"
+          ]
+        }
+      },
+      "slos": {
+        "description": "Pyrra ServiceLevelObjectives keyed by id, each rendered as <release>-<id>. Requires the Pyrra operator (pyrra.dev/v1alpha1 CRD) in the cluster.",
+        "type": "object",
+        "default": {},
+        "propertyNames": {
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "description": "Render this SLO.",
+              "type": "boolean",
+              "default": true
+            },
+            "description": {
+              "description": "Human-readable description shown in Pyrra.",
+              "type": "string"
+            },
+            "target": {
+              "description": "Objective in percent, e.g. \"99.9\".",
+              "type": [
+                "string",
+                "number"
+              ],
+              "pattern": "^[0-9]+(\\.[0-9]+)?$",
+              "exclusiveMinimum": 0,
+              "maximum": 100
+            },
+            "window": {
+              "description": "Rolling window the objective is measured over.",
+              "type": "string",
+              "pattern": "^([0-9]+(ms|s|m|h|d|w|y))+$",
+              "default": "4w"
+            },
+            "indicator": {
+              "description": "Pyrra indicator, exactly one of ratio, latency, latencyNative or boolGauge, passed through verbatim. https://github.com/pyrra-dev/pyrra#kubernetes",
+              "type": "object",
+              "additionalProperties": false,
+              "minProperties": 1,
+              "maxProperties": 1,
+              "properties": {
+                "ratio": {
+                  "type": "object",
+                  "required": [
+                    "errors",
+                    "total"
+                  ]
+                },
+                "latency": {
+                  "type": "object",
+                  "required": [
+                    "success",
+                    "total"
+                  ]
+                },
+                "latencyNative": {
+                  "type": "object",
+                  "required": [
+                    "latency",
+                    "total"
+                  ]
+                },
+                "boolGauge": {
+                  "type": "object",
+                  "required": [
+                    "metric"
+                  ]
+                }
+              }
+            },
+            "alerting": {
+              "description": "Pyrra alerting settings (name, disabled, burnrates, absent), passed through verbatim. Default: multi-window burn-rate alerts named ErrorBudgetBurn.",
+              "type": "object"
+            },
+            "labels": {
+              "description": "Extra labels on the ServiceLevelObjective. Pyrra copies labels prefixed pyrra.dev/ (prefix stripped) onto the alerts it generates, e.g. pyrra.dev/severity.",
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "annotations": {
+              "description": "Annotations on the ServiceLevelObjective.",
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "target",
+            "indicator"
+          ]
+        }
+      }
+    }
+  },
   "x-route-extensions": {
     "gateway": {
       "description": "Which gateway this route attaches to when parentRefs is not set: shared-internal (default), shared-external, dedicated-internal or dedicated-external. dedicated-* renders a per-app Gateway (its own DO load balancer) with certificate and HTTP->HTTPS redirect.",

@@ -213,3 +213,16 @@ gateway:
     issuer: letsencrypt-prod
     # -- Extra infrastructure annotations (DO load-balancer annotations).
     annotations: {}
+
+# -- Alerting. Keyed maps so an environment can override or disable
+# (`enabled: false`) a single entry. Nothing renders on PR previews.
+monitoring:
+  # -- Prometheus alerting rules, keyed by alert name, rendered into one
+  # PrometheusRule `<release>-alerts`. Each: expr (required), for,
+  # keepFiringFor, labels, annotations, enabled.
+  alerts: {}
+  # -- Pyrra ServiceLevelObjectives, one `<release>-<id>` per key. Each:
+  # target (required), indicator (required), window (default 4w),
+  # description, alerting, labels, annotations, enabled. Requires Pyrra in
+  # the cluster.
+  slos: {}

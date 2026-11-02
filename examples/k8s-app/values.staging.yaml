@@ -19,3 +19,9 @@ route:
   main:
     hostnames:
       - myapp.ghostinfra.net
+
+monitoring:
+  alerts:
+    MyappHighErrorRate:
+      labels:
+        severity: warning

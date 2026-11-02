@@ -17,6 +17,13 @@ global:
 {{- end -}}
 {{- $_ := mergeOverwrite .Values (include "k8s-app.hardcodedValues" . | fromYaml) -}}
 
+{{- /* The library runs every value string through tpl; monitoring carries
+Prometheus templating ({{ $labels.x }}, {{ $value }}) that must reach
+Prometheus verbatim. Appended, so an app's own excludePaths are kept. */ -}}
+{{- $evaluation := dig "templateEvaluation" dict .Values.global -}}
+{{- $excludePaths := append (dig "excludePaths" list $evaluation) (list "monitoring") -}}
+{{- $_ := set .Values.global "templateEvaluation" (merge (dict "excludePaths" $excludePaths) $evaluation) -}}
+
 {{- /* Before the env fill and hotReload: the migrations Job copies the app's
 container as declared, then gets the same injected env as every other
 container. */ -}}

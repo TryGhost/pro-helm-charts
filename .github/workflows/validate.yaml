@@ -67,6 +67,12 @@ jobs:
           ! helm template t "$CHART" $base --set migrations.backoffLimit=-1 || exit 1
           ! helm template t "$CHART" $base --set migrations.enabled=true --set migrations.command=null || exit 1   # command is required
           ! helm template t "$CHART" $base --set migrations.container=nope || exit 1   # unknown container
+          ! helm template t "$CHART" $base --set monitoring.bogus=1 || exit 1
+          ! helm template t "$CHART" $base --set monitoring.alerts.X.for=5x || exit 1  # not a duration
+          ! helm template t "$CHART" $base --set monitoring.alerts.bad-name.expr=up || exit 1  # not a valid alert name
+          ! helm template t "$CHART" $base --set monitoring.slos.x.target=99 || exit 1  # indicator is required
+          ! helm template t "$CHART" $base --set monitoring.slos.availability.target=101 || exit 1
+          ! helm template t "$CHART" $base --set monitoring.slos.availability.indicator.bogus.metric=x || exit 1
 
       - name: Derived files are up to date (schema + rendered snapshots)
         # scripts/regen.sh rebuilds values.schema.json, the README values tables and tests/snapshots/;

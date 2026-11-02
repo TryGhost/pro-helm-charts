@@ -1,0 +1,70 @@
+{{- /*
+monitoring.alerts -> one PrometheusRule `<release>-alerts` holding one rule
+group named after the release, one alerting rule per key (the key is the
+alert name). monitoring.slos -> one Pyrra ServiceLevelObjective
+`<release>-<id>` per key; Pyrra turns each into its own recording and
+multi-window burn-rate alerting rules.
+
+Keyed maps rather than lists so a values.<env>.yaml can override or disable
+(`enabled: false`) a single alert or SLO. Nothing renders on PR previews: they
+share the staging namespace and would duplicate the staging release's alerts.
+expr and annotations are emitted verbatim, so Prometheus templating
+({{ $labels.x }}, {{ $value }}) passes through untouched.
+*/ -}}
+{{- if not .Values.preview.prNumber }}
+{{- $rules := list }}
+{{- range $alert, $rule := .Values.monitoring.alerts }}
+{{- if dig "enabled" true $rule }}
+{{- $r := dict "alert" $alert "expr" $rule.expr }}
+{{- with $rule.for }}{{ $_ := set $r "for" . }}{{ end }}
+{{- with $rule.keepFiringFor }}{{ $_ := set $r "keep_firing_for" . }}{{ end }}
+{{- with $rule.labels }}{{ $_ := set $r "labels" . }}{{ end }}
+{{- with $rule.annotations }}{{ $_ := set $r "annotations" . }}{{ end }}
+{{- $rules = append $rules $r }}
+{{- end }}
+{{- end }}
+{{- if $rules }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ .Release.Name }}-alerts
+  labels:
+    {{- include "k8s-app.labels" . | nindent 4 }}
+spec:
+  groups:
+    - name: {{ .Release.Name }}
+      rules:
+        {{- toYaml $rules | nindent 8 }}
+{{- end }}
+{{- range $id, $slo := .Values.monitoring.slos }}
+{{- if dig "enabled" true $slo }}
+---
+apiVersion: pyrra.dev/v1alpha1
+kind: ServiceLevelObjective
+metadata:
+  name: {{ $.Release.Name }}-{{ $id }}
+  labels:
+    {{- include "k8s-app.labels" $ | nindent 4 }}
+    {{- with $slo.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with $slo.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with $slo.description }}
+  description: {{ . | quote }}
+  {{- end }}
+  target: {{ $slo.target | toString | quote }}
+  window: {{ $slo.window | default "4w" }}
+  indicator:
+    {{- toYaml $slo.indicator | nindent 4 }}
+  {{- with $slo.alerting }}
+  alerting:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
