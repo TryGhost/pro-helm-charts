@@ -16554,7 +16554,12 @@
                 "type": "object",
                 "propertyNames": {
                   "not": {
-                    "pattern": "^(app\\.kubernetes\\.io|helm\\.sh)/"
+                    "enum": [
+                      "helm.sh/chart",
+                      "app.kubernetes.io/name",
+                      "app.kubernetes.io/instance",
+                      "app.kubernetes.io/managed-by"
+                    ]
                   }
                 },
                 "additionalProperties": {

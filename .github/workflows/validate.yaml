@@ -76,6 +76,7 @@ jobs:
           ! helm template t "$CHART" $base --set-string monitoring.slos.availability.target=101 || exit 1  # string targets are range-checked too
           ! helm template t "$CHART" $base --set monitoring.slos.alerts.target=99 --set monitoring.slos.alerts.indicator.bool_gauge.metric=up || exit 1  # Pyrra's PrometheusRule would collide with <release>-alerts
           ! helm template t "$CHART" $base --set 'monitoring.slos.availability.labels.app\.kubernetes\.io/name=x' || exit 1  # would duplicate a chart label
+          helm template t "$CHART" $base --set monitoring.slos.x.target=99 --set monitoring.slos.x.indicator.bool_gauge.metric=up --set 'monitoring.slos.x.labels.app\.kubernetes\.io/component=api' >/dev/null  # other app.kubernetes.io/ keys are fine
           ! helm template t "$CHART" $base --set monitoring.slos.availability.indicator.bogus.metric=x || exit 1
 
       - name: Derived files are up to date (schema + rendered snapshots)
