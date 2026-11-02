@@ -1397,16 +1397,16 @@ monitoring:
 | `monitoring.alerts.<id>.keepFiringFor` | string |  | How long the alert keeps firing after expr stops returning (keep_firing_for). |
 | `monitoring.alerts.<id>.labels` | object |  | Labels added to the alert, e.g. severity. |
 | `monitoring.slos` | object | `{}` | Pyrra ServiceLevelObjectives keyed by id, each rendered as <release>-<id>. Requires the Pyrra operator (pyrra.dev/v1alpha1 CRD) in the cluster. |
-| `monitoring.slos.<id>.alerting` | object |  | Pyrra alerting settings (name, disabled, burnrates, absent), passed through verbatim. Default: multi-window burn-rate alerts named ErrorBudgetBurn. |
+| `monitoring.slos.<id>.alerting` | object |  | Pyrra alerting settings (name, absentName, disabled, burnrates, absent, severities), passed through verbatim. Default: multi-window burn-rate alerts named ErrorBudgetBurn, critical for fast and medium burn and absent metrics, warning for slow burn. |
 | `monitoring.slos.<id>.annotations` | object |  | Annotations on the ServiceLevelObjective. |
 | `monitoring.slos.<id>.description` | string |  | Human-readable description shown in Pyrra. |
 | `monitoring.slos.<id>.enabled` | boolean | `true` | Render this SLO. |
 | `monitoring.slos.<id>.indicator` | object |  | Pyrra indicator, exactly one of ratio, latency, latencyNative or bool_gauge, passed through verbatim. https://github.com/pyrra-dev/pyrra#kubernetes |
-| `monitoring.slos.<id>.indicator.bool_gauge` | object |  |  |
-| `monitoring.slos.<id>.indicator.latency` | object |  |  |
-| `monitoring.slos.<id>.indicator.latencyNative` | object |  |  |
-| `monitoring.slos.<id>.indicator.ratio` | object |  |  |
-| `monitoring.slos.<id>.labels` | object |  | Extra labels on the ServiceLevelObjective. Pyrra copies labels prefixed pyrra.dev/ (prefix stripped) onto the alerts it generates, e.g. pyrra.dev/severity. |
+| `monitoring.slos.<id>.indicator.bool_gauge` | object |  | A 0/1 gauge: metric (PromQL selector). |
+| `monitoring.slos.<id>.indicator.latency` | object |  | Fraction of requests under a histogram bucket: success.metric (the le bucket) and total.metric. |
+| `monitoring.slos.<id>.indicator.latencyNative` | object |  | Fraction of requests under latency on a native histogram: latency (a duration) and total.metric. |
+| `monitoring.slos.<id>.indicator.ratio` | object |  | Errors over total: errors.metric and total.metric (PromQL selectors). |
+| `monitoring.slos.<id>.labels` | object |  | Extra labels on the ServiceLevelObjective. Pyrra copies labels prefixed pyrra.dev/ (prefix stripped) onto the alerts it generates, e.g. pyrra.dev/team (set severity through alerting.severities). |
 | `monitoring.slos.<id>.target` | string / number |  | Objective in percent, e.g. "99.9". |
 | `monitoring.slos.<id>.window` | string | `"4w"` | Rolling window the objective is measured over. |
 <!-- /values -->

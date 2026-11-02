@@ -594,6 +594,7 @@
               "maxProperties": 1,
               "properties": {
                 "ratio": {
+                  "description": "Errors over total: errors.metric and total.metric (PromQL selectors).",
                   "type": "object",
                   "required": [
                     "errors",
@@ -601,6 +602,7 @@
                   ]
                 },
                 "latency": {
+                  "description": "Fraction of requests under a histogram bucket: success.metric (the le bucket) and total.metric.",
                   "type": "object",
                   "required": [
                     "success",
@@ -608,6 +610,7 @@
                   ]
                 },
                 "latencyNative": {
+                  "description": "Fraction of requests under latency on a native histogram: latency (a duration) and total.metric.",
                   "type": "object",
                   "required": [
                     "latency",
@@ -615,6 +618,7 @@
                   ]
                 },
                 "bool_gauge": {
+                  "description": "A 0/1 gauge: metric (PromQL selector).",
                   "type": "object",
                   "required": [
                     "metric"
@@ -623,11 +627,11 @@
               }
             },
             "alerting": {
-              "description": "Pyrra alerting settings (name, disabled, burnrates, absent), passed through verbatim. Default: multi-window burn-rate alerts named ErrorBudgetBurn.",
+              "description": "Pyrra alerting settings (name, absentName, disabled, burnrates, absent, severities), passed through verbatim. Default: multi-window burn-rate alerts named ErrorBudgetBurn, critical for fast and medium burn and absent metrics, warning for slow burn.",
               "type": "object"
             },
             "labels": {
-              "description": "Extra labels on the ServiceLevelObjective. Pyrra copies labels prefixed pyrra.dev/ (prefix stripped) onto the alerts it generates, e.g. pyrra.dev/severity.",
+              "description": "Extra labels on the ServiceLevelObjective. Pyrra copies labels prefixed pyrra.dev/ (prefix stripped) onto the alerts it generates, e.g. pyrra.dev/team (set severity through alerting.severities).",
               "type": "object",
               "propertyNames": {
                 "not": {
