@@ -23,8 +23,8 @@ that tpl would fail on (undefined variable). monitoring.yaml reads the raw
 .Values, so it emits them verbatim. Appended, so an app's own excludePaths
 are kept. */ -}}
 {{- $evaluation := dig "templateEvaluation" dict .Values.global -}}
-{{- $excludePaths := append (dig "excludePaths" list $evaluation) (list "monitoring") -}}
-{{- $_ := set .Values.global "templateEvaluation" (merge (dict "excludePaths" $excludePaths) $evaluation) -}}
+{{- $_ := set $evaluation "excludePaths" (append (dig "excludePaths" list $evaluation) (list "monitoring")) -}}
+{{- $_ := set .Values.global "templateEvaluation" $evaluation -}}
 
 {{- /* Before the env fill and hotReload: the migrations Job copies the app's
 container as declared, then gets the same injected env as every other
