@@ -1401,8 +1401,8 @@ monitoring:
 | `monitoring.slos.<id>.annotations` | object |  | Annotations on the ServiceLevelObjective. |
 | `monitoring.slos.<id>.description` | string |  | Human-readable description shown in Pyrra. |
 | `monitoring.slos.<id>.enabled` | boolean | `true` | Render this SLO. |
-| `monitoring.slos.<id>.indicator` | object |  | Pyrra indicator, exactly one of ratio, latency, latencyNative or boolGauge, passed through verbatim. https://github.com/pyrra-dev/pyrra#kubernetes |
-| `monitoring.slos.<id>.indicator.boolGauge` | object |  |  |
+| `monitoring.slos.<id>.indicator` | object |  | Pyrra indicator, exactly one of ratio, latency, latencyNative or bool_gauge, passed through verbatim. https://github.com/pyrra-dev/pyrra#kubernetes |
+| `monitoring.slos.<id>.indicator.bool_gauge` | object |  |  |
 | `monitoring.slos.<id>.indicator.latency` | object |  |  |
 | `monitoring.slos.<id>.indicator.latencyNative` | object |  |  |
 | `monitoring.slos.<id>.indicator.ratio` | object |  |  |

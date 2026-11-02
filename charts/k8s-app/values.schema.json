@@ -16506,7 +16506,7 @@
                 "default": "4w"
               },
               "indicator": {
-                "description": "Pyrra indicator, exactly one of ratio, latency, latencyNative or boolGauge, passed through verbatim. https://github.com/pyrra-dev/pyrra#kubernetes",
+                "description": "Pyrra indicator, exactly one of ratio, latency, latencyNative or bool_gauge, passed through verbatim. https://github.com/pyrra-dev/pyrra#kubernetes",
                 "type": "object",
                 "additionalProperties": false,
                 "minProperties": 1,
@@ -16533,7 +16533,7 @@
                       "total"
                     ]
                   },
-                  "boolGauge": {
+                  "bool_gauge": {
                     "type": "object",
                     "required": [
                       "metric"
