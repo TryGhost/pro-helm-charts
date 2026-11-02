@@ -1535,8 +1535,3 @@ retries, and the drop hook depended on the class at teardown. The preview
 database Jobs now honour `defaultPodOptions.priorityClassName`, as documented.
 Image bumps no longer touch the snapshots (chart-default tags render as
 `__DEFAULT_TAG__`).
-
-### 0.12.0
-
-New `monitoring` key: `alerts` renders a PrometheusRule, `slos` renders Pyrra
-ServiceLevelObjectives. Empty by default; nothing changes for existing apps.
