@@ -16436,12 +16436,14 @@
               "for": {
                 "description": "How long expr must hold before the alert fires.",
                 "type": "string",
-                "pattern": "^([0-9]+(ms|s|m|h|d|w|y))+$"
+                "pattern": "^([0-9]+y)?([0-9]+w)?([0-9]+d)?([0-9]+h)?([0-9]+m)?([0-9]+s)?([0-9]+ms)?$",
+                "minLength": 1
               },
               "keepFiringFor": {
                 "description": "How long the alert keeps firing after expr stops returning (keep_firing_for).",
                 "type": "string",
-                "pattern": "^([0-9]+(ms|s|m|h|d|w|y))+$"
+                "pattern": "^([0-9]+y)?([0-9]+w)?([0-9]+d)?([0-9]+h)?([0-9]+m)?([0-9]+s)?([0-9]+ms)?$",
+                "minLength": 1
               },
               "labels": {
                 "description": "Labels added to the alert, e.g. severity.",
@@ -16468,7 +16470,10 @@
           "type": "object",
           "default": {},
           "propertyNames": {
-            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+            "not": {
+              "const": "alerts"
+            }
           },
           "additionalProperties": {
             "type": "object",
@@ -16489,14 +16494,15 @@
                   "string",
                   "number"
                 ],
-                "pattern": "^[0-9]+(\\.[0-9]+)?$",
+                "pattern": "^(100(\\.0+)?|[1-9][0-9]?(\\.[0-9]+)?|0\\.[0-9]*[1-9][0-9]*)$",
                 "exclusiveMinimum": 0,
                 "maximum": 100
               },
               "window": {
                 "description": "Rolling window the objective is measured over.",
                 "type": "string",
-                "pattern": "^([0-9]+(ms|s|m|h|d|w|y))+$",
+                "pattern": "^([0-9]+y)?([0-9]+w)?([0-9]+d)?([0-9]+h)?([0-9]+m)?([0-9]+s)?([0-9]+ms)?$",
+                "minLength": 1,
                 "default": "4w"
               },
               "indicator": {
@@ -16542,6 +16548,11 @@
               "labels": {
                 "description": "Extra labels on the ServiceLevelObjective. Pyrra copies labels prefixed pyrra.dev/ (prefix stripped) onto the alerts it generates, e.g. pyrra.dev/severity.",
                 "type": "object",
+                "propertyNames": {
+                  "not": {
+                    "pattern": "^(app\\.kubernetes\\.io|helm\\.sh)/"
+                  }
+                },
                 "additionalProperties": {
                   "type": "string"
                 }

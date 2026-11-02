@@ -68,10 +68,14 @@ jobs:
           ! helm template t "$CHART" $base --set migrations.enabled=true --set migrations.command=null || exit 1   # command is required
           ! helm template t "$CHART" $base --set migrations.container=nope || exit 1   # unknown container
           ! helm template t "$CHART" $base --set monitoring.bogus=1 || exit 1
-          ! helm template t "$CHART" $base --set monitoring.alerts.X.for=5x || exit 1  # not a duration
+          ! helm template t "$CHART" $base --set monitoring.alerts.X.expr=up --set monitoring.alerts.X.for=5x || exit 1  # not a duration
+          ! helm template t "$CHART" $base --set monitoring.alerts.X.expr=up --set monitoring.alerts.X.for=5m1h || exit 1  # units out of order
           ! helm template t "$CHART" $base --set monitoring.alerts.bad-name.expr=up || exit 1  # not a valid alert name
           ! helm template t "$CHART" $base --set monitoring.slos.x.target=99 || exit 1  # indicator is required
           ! helm template t "$CHART" $base --set monitoring.slos.availability.target=101 || exit 1
+          ! helm template t "$CHART" $base --set-string monitoring.slos.availability.target=101 || exit 1  # string targets are range-checked too
+          ! helm template t "$CHART" $base --set monitoring.slos.alerts.target=99 --set monitoring.slos.alerts.indicator.boolGauge.metric=up || exit 1  # Pyrra's PrometheusRule would collide with <release>-alerts
+          ! helm template t "$CHART" $base --set 'monitoring.slos.availability.labels.app\.kubernetes\.io/name=x' || exit 1  # would duplicate a chart label
           ! helm template t "$CHART" $base --set monitoring.slos.availability.indicator.bogus.metric=x || exit 1
 
       - name: Derived files are up to date (schema + rendered snapshots)
