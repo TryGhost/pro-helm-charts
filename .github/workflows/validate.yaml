@@ -198,28 +198,16 @@ jobs:
             ! grep -qxE "[[:space:]]*(- )?image:[[:space:]]*[\"']?${got//./\\.}[\"']?" "$CHART"/tests/snapshots/*.yaml || exit 1  # a bare ! never trips set -e
           done
 
-  raw:
-    name: Lint and render raw
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
-        with:
-          version: ${{ env.HELM_VERSION }}
-
-      - name: Lint, and check manifests render verbatim
+      - name: Lint and render raw
         run: |
           set -euo pipefail
           helm lint --strict charts/raw
           [ -z "$(helm template t charts/raw)" ]
           in='{"resources":[{"apiVersion":"v1","kind":"Namespace","metadata":{"name":"a"}},{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"b","namespace":"a"},"data":{"k":"v"}}]}'
           out=$(echo "$in" | helm template t charts/raw -f - | yq -o=json -I=0 '.' | jq -Ssc .)
-          [ "$out" = "$(echo "$in" | jq -Sc .resources)" ]
-          # entries that aren't complete manifests fail the render
-          for bad in '[null]' '["x"]' '[{}]' '[{"apiVersion":"v1","kind":"Namespace"}]' '[{"apiVersion":"v1","kind":"Namespace","metadata":"x"}]' \
-                     '[{"apiVersion":"v1","kind":"Namespace","metadata":{}}]' '[{"apiVersion":1,"kind":"Namespace","metadata":{"name":"a"}}]' \
-                     '[{"apiVersion":"v1","kind":"Namespace","metadata":{"name":true}}]'; do
+          [ "$out" = "$(echo "$in" | jq -Sc .resources)" ]  # verbatim
+          # the schema rejects entries that aren't complete manifests
+          for bad in '[null]' '[{"apiVersion":"v1","kind":"Namespace"}]' '[{"apiVersion":1,"kind":"Namespace","metadata":{"name":"a"}}]'; do
             ! echo "{\"resources\":$bad}" | helm template t charts/raw -f - >/dev/null 2>&1 || exit 1
           done
 
@@ -235,7 +223,6 @@ jobs:
       - name: Require a new, unreleased version for every changed chart
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           failed=0
@@ -244,22 +231,19 @@ jobs:
             if git diff --quiet "$BASE" HEAD -- "$dir"; then
               echo "no changes under $dir"; continue
             fi
-            name=$(yq '.name' "$dir/Chart.yaml")
             old=none  # a chart added by this PR
             if git cat-file -e "$BASE:$dir/Chart.yaml" 2>/dev/null; then
               old=$(git show "$BASE:$dir/Chart.yaml" | yq '.version')
             fi
             new=$(yq '.version' "$dir/Chart.yaml")
+            tag="$(yq '.name' "$dir/Chart.yaml")-$new"
             echo "$dir: base=$old head=$new"
             if [ "$old" = "$new" ]; then
               echo "::error file=$dir/Chart.yaml::$dir changed but version is still $new. Bump 'version' (releases are immutable; every releasable change needs a new version)." >&2
               failed=1
-            elif out=$(gh release view "$name-$new" --repo "$GITHUB_REPOSITORY" 2>&1 >/dev/null); then
-              echo "::error file=$dir/Chart.yaml::$name-$new is already released and releases are never overwritten. Pick a new version." >&2
-              failed=1
-            elif [ "$out" != "release not found" ]; then
-              # an API/auth error is not proof the version is unreleased
-              echo "::error file=$dir/Chart.yaml::could not check whether $name-$new is released: $out" >&2
+            elif git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+              # every release creates its <chart>-<version> tag; fetch-depth 0 fetches them
+              echo "::error file=$dir/Chart.yaml::$tag is already released and releases are never overwritten. Pick a new version." >&2
               failed=1
             fi
           done

@@ -52,11 +52,11 @@ job of every release:
   `{{ (.db | fromJson).* }}` expressions untouched, nothing injected into
   containers by `secretsInjection`, hot reload leaving the app's env alone,
   the SSH key mounted only into git-sync, explicit overrides honoured.
-- `charts/raw`: `helm lint --strict`, manifests render verbatim, and entries
-  that aren't complete manifests (null, scalar, missing or non-string
-  `apiVersion`, `kind` or `metadata.name`) fail the render.
+- `charts/raw`: `helm lint --strict`, manifests render verbatim, and its
+  schema rejects entries without string `apiVersion`, `kind` and
+  `metadata.name`.
 - On PRs: a change under any `charts/<chart>` requires a new `version` for
-  that chart that has not been released.
+  that chart with no `<chart>-<version>` release tag.
 
 Snapshots prove the manifests are what we expect, not that the workloads
 run. Verify ESO, git-sync and the dev runner on a staging or preview
@@ -81,10 +81,9 @@ kept. Only `GITHUB_TOKEN` is used.
 Repository settings this relies on:
 
 - Public repository (GitHub Pages), Pages served from `gh-pages` / root.
-- A ruleset on `main` requiring the `Lint and render`, `Lint and render raw`
-  and `Chart version bumped` checks and a review. Without it the
-  version-bump rule is advisory: direct pushes to `main` skip the PR-only
-  check.
+- A ruleset on `main` requiring the `Lint and render` and `Chart version
+  bumped` checks and a review. Without it the version-bump rule is advisory:
+  direct pushes to `main` skip the PR-only check.
 - Renovate installed on the repository.
 
 ## Renovate

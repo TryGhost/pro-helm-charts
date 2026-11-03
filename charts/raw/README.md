@@ -1,9 +1,9 @@
 # raw
 
 Renders every manifest in `resources` as-is. No templating, defaults or
-labels are added. An entry that isn't a map with string `apiVersion`, `kind`
-and `metadata.name` fails the render, so a null or partial entry from terraform
-is caught before ArgoCD syncs.
+labels are added. `values.schema.json` rejects entries without string
+`apiVersion`, `kind` and `metadata.name`, so a null or partial entry from
+terraform fails the render instead of the ArgoCD sync.
 
 ```yaml
 resources:

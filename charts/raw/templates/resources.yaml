@@ -1,10 +1,4 @@
-{{- range $i, $r := .Values.resources }}
-{{- if not (kindIs "map" $r) }}
-{{- fail (printf "resources[%d] must be a manifest (a map), got %s" $i (kindOf $r)) }}
-{{- end }}
-{{- if not (and (kindIs "string" $r.apiVersion) $r.apiVersion (kindIs "string" $r.kind) $r.kind (kindIs "map" $r.metadata) (kindIs "string" $r.metadata.name) $r.metadata.name) }}
-{{- fail (printf "resources[%d] needs string apiVersion, kind and metadata.name" $i) }}
-{{- end }}
+{{- range .Values.resources }}
 ---
-{{ toYaml $r }}
+{{ toYaml . }}
 {{- end }}
