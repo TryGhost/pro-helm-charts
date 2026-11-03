@@ -1,0 +1,9 @@
+apiVersion: v2
+name: raw
+description: >-
+  Renders the manifests passed in `resources` verbatim. Used by terraform's
+  argocd module to deliver objects it builds (e.g. team RBAC) to every cluster
+  through ArgoCD, without a provider per cluster.
+type: application
+# Bump on every releasable change (releases are immutable).
+version: 0.1.0

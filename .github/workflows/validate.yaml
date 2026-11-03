@@ -198,6 +198,25 @@ jobs:
             ! grep -qxE "[[:space:]]*(- )?image:[[:space:]]*[\"']?${got//./\\.}[\"']?" "$CHART"/tests/snapshots/*.yaml || exit 1  # a bare ! never trips set -e
           done
 
+  raw:
+    name: Lint and render raw
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Lint, and check manifests render verbatim
+        run: |
+          set -euo pipefail
+          helm lint --strict charts/raw
+          [ -z "$(helm template t charts/raw)" ]
+          in='{"resources":[{"apiVersion":"v1","kind":"Namespace","metadata":{"name":"a"}},{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"b","namespace":"a"},"data":{"k":"v"}}]}'
+          out=$(echo "$in" | helm template t charts/raw -f - | yq -o=json -I=0 '.' | jq -Ssc .)
+          [ "$out" = "$(echo "$in" | jq -Sc .resources)" ]
+
   version-bump:
     name: Chart version bumped
     if: github.event_name == 'pull_request'
