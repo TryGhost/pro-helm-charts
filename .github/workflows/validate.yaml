@@ -230,23 +230,31 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Require a new, unreleased version when the chart changes
+      - name: Require a new, unreleased version for every changed chart
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          if git diff --quiet "$BASE" HEAD -- "$CHART"; then
-            echo "no changes under $CHART"; exit 0
-          fi
-          old=$(git show "$BASE:$CHART/Chart.yaml" 2>/dev/null | yq '.version' || echo none)
-          new=$(yq '.version' "$CHART/Chart.yaml")
-          echo "base=$old head=$new"
-          if [ "$old" = "$new" ]; then
-            echo "::error file=$CHART/Chart.yaml::$CHART changed but version is still $new. Bump 'version' (releases are immutable; every releasable change needs a new version)." >&2
-            exit 1
-          fi
-          if gh release view "k8s-app-$new" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "::error file=$CHART/Chart.yaml::k8s-app-$new is already released and releases are never overwritten. Pick a new version." >&2
-            exit 1
-          fi
+          failed=0
+          for dir in charts/*/; do
+            dir=${dir%/}
+            if git diff --quiet "$BASE" HEAD -- "$dir"; then
+              echo "no changes under $dir"; continue
+            fi
+            name=$(yq '.name' "$dir/Chart.yaml")
+            old=none  # a chart added by this PR
+            if git cat-file -e "$BASE:$dir/Chart.yaml" 2>/dev/null; then
+              old=$(git show "$BASE:$dir/Chart.yaml" | yq '.version')
+            fi
+            new=$(yq '.version' "$dir/Chart.yaml")
+            echo "$dir: base=$old head=$new"
+            if [ "$old" = "$new" ]; then
+              echo "::error file=$dir/Chart.yaml::$dir changed but version is still $new. Bump 'version' (releases are immutable; every releasable change needs a new version)." >&2
+              failed=1
+            elif gh release view "$name-$new" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              echo "::error file=$dir/Chart.yaml::$name-$new is already released and releases are never overwritten. Pick a new version." >&2
+              failed=1
+            fi
+          done
+          exit "$failed"

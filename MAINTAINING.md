@@ -52,8 +52,11 @@ job of every release:
   `{{ (.db | fromJson).* }}` expressions untouched, nothing injected into
   containers by `secretsInjection`, hot reload leaving the app's env alone,
   the SSH key mounted only into git-sync, explicit overrides honoured.
-- On PRs: `charts/k8s-app` changes require a new `version` that has not been
-  released.
+- `charts/raw`: `helm lint --strict`, manifests render verbatim, and entries
+  that aren't complete manifests (null, scalar, missing `apiVersion`, `kind`
+  or `metadata.name`) fail the render.
+- On PRs: a change under any `charts/<chart>` requires a new `version` for
+  that chart that has not been released.
 
 Snapshots prove the manifests are what we expect, not that the workloads
 run. Verify ESO, git-sync and the dev runner on a staging or preview
@@ -63,7 +66,7 @@ deployment.
 
 Releases are immutable: a version, once published, is never rebuilt or
 overwritten (the repository also has GitHub's immutable releases enabled).
-Every releasable change to `charts/k8s-app` needs a new `version`; CI blocks
+Every releasable change to a chart needs a new `version`; CI blocks
 PRs without one or reusing a released one, and the release job skips versions
 that already have a GitHub release.
 
@@ -78,8 +81,8 @@ kept. Only `GITHUB_TOKEN` is used.
 Repository settings this relies on:
 
 - Public repository (GitHub Pages), Pages served from `gh-pages` / root.
-- A ruleset on `main` requiring the `Lint and render` and `Chart version
-  bumped` checks and a review. Without it the version-bump rule is advisory:
+- A ruleset on `main` requiring the `Lint and render`, `Lint and render raw`
+  and `Chart version bumped` checks and a review. Without it the version-bump rule is advisory:
   direct pushes to `main` skip the PR-only check.
 - Renovate installed on the repository.
 
