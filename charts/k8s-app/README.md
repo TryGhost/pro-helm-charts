@@ -620,7 +620,7 @@ persistence:
     name: app-secrets
     defaultMode: 0440
     items:
-      - key: myapp-git-sync-ssh
+      - key: git-sync-ssh
         path: ssh
     advancedMounts:
       main:
@@ -1022,7 +1022,7 @@ previews the group is empty and nothing preview-specific renders.
 
 Renders the `app-secrets` ExternalSecret (every Secret Manager secret named
 `<release namespace>_<key>` and labelled `namespace=<release namespace>`, one
-key per secret, as `<release namespace>-<key>`)
+key per secret, as `<key>`)
 and, with `database: true`, the `app-db-secrets` ExternalSecret (Terraform's
 `<env>-<app>db` JSON secret exploded into `host`, `public_host`, `port`,
 `user`, `password`, `database`, `uri`, `public_uri`, `ssl_ca`). Both sync
@@ -1180,7 +1180,7 @@ declared):
   whose anonymous limit of 60 requests per hour is shared by every pod behind
   the cluster NAT.
 - `persistence.workspace` (emptyDir), `persistence.git-sync-ssh` (only the
-  `<namespace>-git-sync-ssh` key of `app-secrets`, mode `0440`, mounted only
+  `git-sync-ssh` key of `app-secrets`, mode `0440`, mounted only
   into the two git-sync containers) and `persistence.git-sync-hosts`.
 - `defaultPodOptions.securityContext.fsGroup: 65533` so git-sync can read
   the key.
@@ -1226,7 +1226,7 @@ Example: [`examples/k8s-app/values.preview.yaml`](../../examples/k8s-app/values.
 | `hotReload.ref` | string | `""` | Git ref to follow (git-sync's GITSYNC_REF). Empty = derived at render time as refs/pull/<preview.prNumber>/head. Set explicitly (e.g. a branch) to override. |
 | `hotReload.repo` | string | `""` | Git repository to sync (SSH form, git-sync's GITSYNC_REPO), e.g. git@github.com:TryGhost/Daisy.js.git. Empty = preview.gitRepo, itself defaulting to git@github.com:<preview.owner>/<release namespace>.git. |
 | `hotReload.ssh` | object |  | SSH deploy key and host key settings. |
-| `hotReload.ssh.key` | string | `""` | Key inside that Secret. Defaults to "<namespace>-git-sync-ssh" (namespace == app name by convention), matching the Terraform argocd module: per-PR preview releases are named <app>-<pr>, but the deploy key is provisioned per app, not per release. |
+| `hotReload.ssh.key` | string | `""` | Key inside that Secret. Defaults to "git-sync-ssh", the key of the <namespace>_git-sync-ssh secret written by the Terraform argocd module: per-PR preview releases are named <app>-<pr>, but the deploy key is provisioned per app, not per release. |
 | `hotReload.ssh.knownHosts` | string | `"github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl\n"` | Pinned SSH host key(s) for the git host, rendered into a ConfigMap mounted at /etc/git-hosts/known_hosts (host-key verification on). No runtime lookups: pods boot without network calls to GitHub's API. https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints |
 | `hotReload.ssh.secretName` | string | `"app-secrets"` | Secret holding the read-only deploy key (by convention the app-secrets Secret created by secretsInjection). |
 | `hotReload.workspace` | string | `"/workspace"` | emptyDir mount path shared by git-sync and the app container. |

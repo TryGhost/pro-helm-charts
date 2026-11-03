@@ -217,10 +217,10 @@ spec:
         tags:
           namespace: "myapp"
       rewrite:
-        # Keys keep the <namespace>-<key> names apps already reference
+        # The key is <key>: the namespace is already the Secret's
         - regexp:
             source: "^myapp_"
-            target: "myapp-"
+            target: ""
 ---
 apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: HTTPRoute
