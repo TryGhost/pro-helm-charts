@@ -339,12 +339,26 @@ spec:
   target:
     name: app-secrets
   dataFrom:
+    # Migration: unprefixed secrets, keyed verbatim, until every app secret is
+    # renamed to <namespace>_<key>; then drop this entry. Delete each original
+    # right after creating its copy: both map to the same key.
     - find:
         # Stated explicitly (ESO defaults them) so ArgoCD does not see drift
         conversionStrategy: Default
         decodingStrategy: None
         tags:
           namespace: myapp
+    - find:
+        conversionStrategy: Default
+        decodingStrategy: None
+        path: myapp_
+        tags:
+          namespace: myapp
+      rewrite:
+        # Keys keep the <namespace>-<key> names apps already reference
+        - regexp:
+            source: "^myapp_"
+            target: "myapp-"
 ---
 apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: HTTPRoute
