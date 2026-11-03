@@ -339,21 +339,8 @@ spec:
   target:
     name: app-secrets
   dataFrom:
-    # Migration: every labelled secret, prefixed or not, until all are renamed
-    # to <namespace>_<key>; then drop this entry. Same rewrite as below so
-    # prefixed secrets don't also appear verbatim. The next entry overrides
-    # it, so a renamed copy wins over its not-yet-deleted original.
     - find:
         # Stated explicitly (ESO defaults them) so ArgoCD does not see drift
-        conversionStrategy: Default
-        decodingStrategy: None
-        tags:
-          namespace: "myapp"
-      rewrite:
-        - regexp:
-            source: "^myapp_"
-            target: "myapp-"
-    - find:
         conversionStrategy: Default
         decodingStrategy: None
         path: "myapp_"
