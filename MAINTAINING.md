@@ -52,8 +52,11 @@ job of every release:
   `{{ (.db | fromJson).* }}` expressions untouched, nothing injected into
   containers by `secretsInjection`, hot reload leaving the app's env alone,
   the SSH key mounted only into git-sync, explicit overrides honoured.
-- On PRs: `charts/k8s-app` changes require a new `version` that has not been
-  released.
+- `charts/raw`: `helm lint --strict`, manifests render verbatim, and its
+  schema rejects entries without string `apiVersion`, `kind` and
+  `metadata.name`.
+- On PRs: a change under any `charts/<chart>` requires a new `version` for
+  that chart with no `<chart>-<version>` release tag.
 
 Snapshots prove the manifests are what we expect, not that the workloads
 run. Verify ESO, git-sync and the dev runner on a staging or preview
@@ -63,13 +66,13 @@ deployment.
 
 Releases are immutable: a version, once published, is never rebuilt or
 overwritten (the repository also has GitHub's immutable releases enabled).
-Every releasable change to `charts/k8s-app` needs a new `version`; CI blocks
+Every releasable change to a chart needs a new `version`; CI blocks
 PRs without one or reusing a released one, and the release job skips versions
 that already have a GitHub release.
 
 Merging to `main` with a chart change runs `.github/workflows/release.yaml`:
 validate, `helm dependency build` (bundling the locked common), `helm
-package`, `gh release create k8s-app-<version>` with the `.tgz` attached
+package`, `gh release create <chart>-<version>` with the `.tgz` attached
 (assets are uploaded at creation, which is what immutable releases require and
 why chart-releaser is not used), and `helm repo index --merge` into
 `index.yaml` on `gh-pages`, pointing at the release asset. Old entries are

@@ -7,6 +7,7 @@ anonymously; every release bundles its dependencies.
 | Chart | What it is | Docs |
 |---|---|---|
 | [`charts/k8s-app`](charts/k8s-app) | Our application chart: [bjw-s `app-template`](https://bjw-s-labs.github.io/helm-charts/docs/app-template/) semantics via the unmodified upstream `common` library, plus External Secrets injection, git-sync hot reload and per-PR preview databases. | [Manual](charts/k8s-app/README.md) |
+| [`charts/raw`](charts/raw) | Renders the manifests passed in `resources` verbatim; terraform's argocd module delivers team RBAC through it. | [README](charts/raw/README.md) |
 
 Apps consume a chart as the single dependency of an umbrella chart in their
 `.k8s/` directory; [`examples/k8s-app`](examples/k8s-app) is the reference

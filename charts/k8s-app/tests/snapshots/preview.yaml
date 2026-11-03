@@ -343,8 +343,14 @@ spec:
         # Stated explicitly (ESO defaults them) so ArgoCD does not see drift
         conversionStrategy: Default
         decodingStrategy: None
+        path: "myapp_"
         tags:
-          namespace: myapp
+          namespace: "myapp"
+      rewrite:
+        # Keys keep the <namespace>-<key> names apps already reference
+        - regexp:
+            source: "^myapp_"
+            target: "myapp-"
 ---
 apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: HTTPRoute
