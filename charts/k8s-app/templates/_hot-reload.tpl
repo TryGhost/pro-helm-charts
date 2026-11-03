@@ -23,7 +23,7 @@ as the app declared them.
 {{- end -}}
 
 {{- define "k8s-app.hotReload.sshKey" -}}
-{{- default (printf "%s-git-sync-ssh" .Release.Namespace) .Values.hotReload.ssh.key -}}
+{{- default "git-sync-ssh" .Values.hotReload.ssh.key -}}
 {{- end -}}
 
 {{- define "k8s-app.preview.gitRepo" -}}

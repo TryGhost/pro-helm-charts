@@ -228,7 +228,7 @@
           },
           "key": {
             "type": "string",
-            "description": "Key inside that Secret. Defaults to \"<namespace>-git-sync-ssh\" (namespace == app name by convention), matching the Terraform argocd module: per-PR preview releases are named <app>-<pr>, but the deploy key is provisioned per app, not per release.",
+            "description": "Key inside that Secret. Defaults to \"git-sync-ssh\", the key of the <namespace>_git-sync-ssh secret written by the Terraform argocd module: per-PR preview releases are named <app>-<pr>, but the deploy key is provisioned per app, not per release.",
             "default": ""
           },
           "knownHosts": {
