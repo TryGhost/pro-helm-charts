@@ -78,6 +78,13 @@ jobs:
           ! helm template t "$CHART" $base --set 'monitoring.slos.availability.labels.app\.kubernetes\.io/name=x' || exit 1  # would duplicate a chart label
           helm template t "$CHART" $base --set monitoring.slos.x.target=99 --set monitoring.slos.x.indicator.bool_gauge.metric=up --set 'monitoring.slos.x.labels.app\.kubernetes\.io/component=api' >/dev/null  # other app.kubernetes.io/ keys are fine
           ! helm template t "$CHART" $base --set monitoring.slos.availability.indicator.bogus.metric=x || exit 1
+          ! helm template t "$CHART" $base --set monitoring.metrics.port=70000 || exit 1  # not a port
+          ! helm template t "$CHART" $base --set monitoring.metrics.path=metrics || exit 1  # path must be absolute
+          ! helm template t "$CHART" $base --set monitoring.metrics.bogus=1 || exit 1
+          ! helm template t "$CHART" $base --set 'controllers.main.containers.main.ports[0].name=metrics' --set 'controllers.main.containers.main.ports[0].containerPort=9100' || exit 1  # metrics name on another port
+          out=$(helm template t "$CHART" $base --set monitoring.metrics.enabled=false)
+          ! grep -q 'kind: PodMonitor' <<<"$out" || exit 1  # disabled: no PodMonitor
+          ! grep -q 'containerPort: 9090' <<<"$out" || exit 1  # and no port
 
       - name: Derived files are up to date (schema + rendered snapshots)
         # scripts/regen.sh rebuilds values.schema.json, the README values tables and tests/snapshots/;

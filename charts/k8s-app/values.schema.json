@@ -16408,10 +16408,61 @@
       ]
     },
     "monitoring": {
-      "description": "Alerting: Prometheus alerting rules and Pyrra SLOs. Keyed maps so an environment can override or disable a single entry. Nothing renders on PR previews.",
+      "description": "Monitoring: the PodMonitor scraping the app's metrics, Prometheus alerting rules and Pyrra SLOs. Keyed maps so an environment can override or disable a single entry. Nothing renders on PR previews.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "metrics": {
+          "description": "Prometheus scrape of the app's own metrics: one PodMonitor <release> over the pods of the listed controllers, labelled release=kube-prometheus-stack so that Prometheus selects it, and the port declared on their container (the PodMonitor only keeps containers declaring it). On by default.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "description": "Render the PodMonitor and declare the port. Disable for an app that serves no metrics.",
+              "type": "boolean",
+              "default": true
+            },
+            "port": {
+              "description": "Container port serving the metrics.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535,
+              "default": 9090
+            },
+            "path": {
+              "description": "HTTP path of the metrics endpoint.",
+              "type": "string",
+              "pattern": "^/",
+              "default": "/metrics"
+            },
+            "interval": {
+              "description": "Scrape interval.",
+              "type": "string",
+              "pattern": "^([0-9]+y)?([0-9]+w)?([0-9]+d)?([0-9]+h)?([0-9]+m)?([0-9]+s)?([0-9]+ms)?$",
+              "minLength": 1,
+              "default": "30s"
+            },
+            "controllers": {
+              "description": "Controllers whose pods are scraped (the app.kubernetes.io/controller label).",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "uniqueItems": true,
+              "default": [
+                "main"
+              ]
+            },
+            "container": {
+              "description": "Container of each listed controller that serves the metrics; the chart adds the port (named metrics) to it unless it already declares it.",
+              "type": "string",
+              "minLength": 1,
+              "default": "main"
+            }
+          }
+        },
         "alerts": {
           "description": "Prometheus alerting rules keyed by alert name, rendered into one PrometheusRule <release>-alerts (one rule group named after the release).",
           "type": "object",

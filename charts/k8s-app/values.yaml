@@ -214,9 +214,21 @@ gateway:
     # -- Extra infrastructure annotations (DO load-balancer annotations).
     annotations: {}
 
-# -- Alerting. Keyed maps so an environment can override or disable
+# -- Monitoring. Keyed maps so an environment can override or disable
 # (`enabled: false`) a single entry. Nothing renders on PR previews.
 monitoring:
+  # -- Prometheus scrape of the app's own metrics: one PodMonitor `<release>`
+  # over the pods of `controllers`, labelled for kube-prometheus-stack, and
+  # the port declared on their `container`. Disable for an app that serves no
+  # metrics.
+  metrics:
+    enabled: true
+    port: 9090
+    path: /metrics
+    interval: 30s
+    controllers:
+      - main
+    container: main
   # -- Prometheus alerting rules, keyed by alert name, rendered into one
   # PrometheusRule `<release>-alerts`. Each: expr (required), for,
   # keepFiringFor, labels, annotations, enabled.
