@@ -209,13 +209,10 @@ spec:
   target:
     name: app-secrets
   dataFrom:
-    # Migration: every labelled secret, until every app secret is renamed to
-    # <namespace>_<key>; then drop this entry. It matches the prefixed copies
-    # too (ESO's GCP provider ignores tags when name is set, so they can't be
-    # excluded), so it applies the same rewrite: no <namespace>_ keys leak
-    # through. An original and its copy map to the same key; the next entry
-    # always wins, so the copy's value is used. Delete each original once its
-    # copy exists.
+    # Migration: every labelled secret, prefixed or not, until all are renamed
+    # to <namespace>_<key>; then drop this entry. Same rewrite as below so
+    # prefixed secrets don't also appear verbatim. The next entry overrides
+    # it, so a renamed copy wins over its not-yet-deleted original.
     - find:
         # Stated explicitly (ESO defaults them) so ArgoCD does not see drift
         conversionStrategy: Default

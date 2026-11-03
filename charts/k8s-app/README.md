@@ -1023,8 +1023,8 @@ previews the group is empty and nothing preview-specific renders.
 Renders the `app-secrets` ExternalSecret (every Secret Manager secret named
 `<release namespace>_<key>` and labelled `namespace=<release namespace>`, one
 key per secret, as `<release namespace>-<key>`; until the existing secrets are
-renamed it also takes unprefixed secrets with the label, keyed verbatim, so
-until then the label alone decides what lands in the namespace)
+renamed it also takes unprefixed secrets with the label alone, keyed
+verbatim)
 and, with `database: true`, the `app-db-secrets` ExternalSecret (Terraform's
 `<env>-<app>db` JSON secret exploded into `host`, `public_host`, `port`,
 `user`, `password`, `database`, `uri`, `public_uri`, `ssl_ca`). Both sync
