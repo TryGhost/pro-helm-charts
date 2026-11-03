@@ -217,7 +217,9 @@ jobs:
           out=$(echo "$in" | helm template t charts/raw -f - | yq -o=json -I=0 '.' | jq -Ssc .)
           [ "$out" = "$(echo "$in" | jq -Sc .resources)" ]
           # entries that aren't complete manifests fail the render
-          for bad in '[null]' '["x"]' '[{}]' '[{"apiVersion":"v1","kind":"Namespace"}]' '[{"apiVersion":"v1","kind":"Namespace","metadata":"x"}]'; do
+          for bad in '[null]' '["x"]' '[{}]' '[{"apiVersion":"v1","kind":"Namespace"}]' '[{"apiVersion":"v1","kind":"Namespace","metadata":"x"}]' \
+                     '[{"apiVersion":"v1","kind":"Namespace","metadata":{}}]' '[{"apiVersion":1,"kind":"Namespace","metadata":{"name":"a"}}]' \
+                     '[{"apiVersion":"v1","kind":"Namespace","metadata":{"name":true}}]'; do
             ! echo "{\"resources\":$bad}" | helm template t charts/raw -f - >/dev/null 2>&1 || exit 1
           done
 
@@ -252,8 +254,12 @@ jobs:
             if [ "$old" = "$new" ]; then
               echo "::error file=$dir/Chart.yaml::$dir changed but version is still $new. Bump 'version' (releases are immutable; every releasable change needs a new version)." >&2
               failed=1
-            elif gh release view "$name-$new" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            elif out=$(gh release view "$name-$new" --repo "$GITHUB_REPOSITORY" 2>&1 >/dev/null); then
               echo "::error file=$dir/Chart.yaml::$name-$new is already released and releases are never overwritten. Pick a new version." >&2
+              failed=1
+            elif [ "$out" != "release not found" ]; then
+              # an API/auth error is not proof the version is unreleased
+              echo "::error file=$dir/Chart.yaml::could not check whether $name-$new is released: $out" >&2
               failed=1
             fi
           done

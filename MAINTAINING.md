@@ -53,8 +53,8 @@ job of every release:
   containers by `secretsInjection`, hot reload leaving the app's env alone,
   the SSH key mounted only into git-sync, explicit overrides honoured.
 - `charts/raw`: `helm lint --strict`, manifests render verbatim, and entries
-  that aren't complete manifests (null, scalar, missing `apiVersion`, `kind`
-  or `metadata.name`) fail the render.
+  that aren't complete manifests (null, scalar, missing or non-string
+  `apiVersion`, `kind` or `metadata.name`) fail the render.
 - On PRs: a change under any `charts/<chart>` requires a new `version` for
   that chart that has not been released.
 

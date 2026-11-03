@@ -2,8 +2,8 @@
 {{- if not (kindIs "map" $r) }}
 {{- fail (printf "resources[%d] must be a manifest (a map), got %s" $i (kindOf $r)) }}
 {{- end }}
-{{- if not (and $r.apiVersion $r.kind (kindIs "map" $r.metadata) $r.metadata.name) }}
-{{- fail (printf "resources[%d] needs apiVersion, kind and metadata.name" $i) }}
+{{- if not (and (kindIs "string" $r.apiVersion) $r.apiVersion (kindIs "string" $r.kind) $r.kind (kindIs "map" $r.metadata) (kindIs "string" $r.metadata.name) $r.metadata.name) }}
+{{- fail (printf "resources[%d] needs string apiVersion, kind and metadata.name" $i) }}
 {{- end }}
 ---
 {{ toYaml $r }}
