@@ -38,7 +38,7 @@ Contents
 - [k8s-app: migrations `migrations`](#k8s-app-migrations-migrations)
 - [k8s-app: hot reload `hotReload`](#k8s-app-hot-reload-hotreload)
 - [k8s-app: preview database `previewDatabase`](#k8s-app-preview-database-previewdatabase)
-- [k8s-app: alerting `monitoring`](#k8s-app-alerting-monitoring)
+- [k8s-app: monitoring `monitoring`](#k8s-app-monitoring-monitoring)
 - [k8s-app: defaults applied to every release](#k8s-app-defaults-applied-to-every-release)
 - [Upgrading](#upgrading)
 
@@ -62,7 +62,7 @@ version: 0.0.0
 dependencies:
   - name: k8s-app
     repository: https://tryghost.github.io/pro-helm-charts
-    version: 0.12.0
+    version: 0.13.0
 ```
 
 ```yaml
@@ -1352,8 +1352,15 @@ configuration; it selects nothing by itself:
 | `gateway.shared.internal.namespace` | string | `"default"` | Namespace it lives in. |
 <!-- /values -->
 
-## k8s-app: alerting `monitoring`
+## k8s-app: monitoring `monitoring`
 
+- `monitoring.metrics`: Prometheus scrapes the app's `/metrics` on port `9090`
+  by default, through one PodMonitor `<release>` over the pods of
+  `controllers` (default `main`), labelled `release: kube-prometheus-stack`.
+  The chart declares the port (named `metrics`) on each pod's `container`
+  (default `main`), since the PodMonitor only keeps containers declaring it;
+  it needs no Service port. Set `enabled: false` for an app that serves no
+  metrics.
 - `monitoring.alerts`: Prometheus alerting rules keyed by alert name, rendered
   into one PrometheusRule `<release>-alerts`. `expr` and `annotations` are
   emitted verbatim, so `{{ $labels.x }}` and `{{ $value }}` work.
@@ -1388,7 +1395,7 @@ monitoring:
 <!-- values: monitoring -->
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `monitoring` | object |  | Alerting: Prometheus alerting rules and Pyrra SLOs. Keyed maps so an environment can override or disable a single entry. Nothing renders on PR previews. |
+| `monitoring` | object |  | Monitoring: the PodMonitor scraping the app's metrics, Prometheus alerting rules and Pyrra SLOs. Keyed maps so an environment can override or disable a single entry. Nothing renders on PR previews. |
 | `monitoring.alerts` | object | `{}` | Prometheus alerting rules keyed by alert name, rendered into one PrometheusRule <release>-alerts (one rule group named after the release). |
 | `monitoring.alerts.<id>.annotations` | object |  | Annotations such as summary and description. Prometheus templating ({{ $labels.x }}, {{ $value }}) passes through. |
 | `monitoring.alerts.<id>.enabled` | boolean | `true` | Render this alert. |
@@ -1396,6 +1403,7 @@ monitoring:
 | `monitoring.alerts.<id>.for` | string |  | How long expr must hold before the alert fires. |
 | `monitoring.alerts.<id>.keepFiringFor` | string |  | How long the alert keeps firing after expr stops returning (keep_firing_for). |
 | `monitoring.alerts.<id>.labels` | object |  | Labels added to the alert, e.g. severity. |
+| `monitoring.metrics` | object |  | Prometheus scrape of the app's own metrics: one PodMonitor <release> over the pods of the listed controllers, labelled release=kube-prometheus-stack so that Prometheus selects it, and the port declared on their container (the PodMonitor only keeps containers declaring it). On by default. |
 | `monitoring.slos` | object | `{}` | Pyrra ServiceLevelObjectives keyed by id, each rendered as <release>-<id>. Requires the Pyrra operator (pyrra.dev/v1alpha1 CRD) in the cluster. |
 | `monitoring.slos.<id>.alerting` | object |  | Pyrra alerting settings (name, absentName, disabled, burnrates, absent, severities), passed through verbatim. Default: multi-window burn-rate alerts named ErrorBudgetBurn, critical for fast and medium burn and absent metrics, warning for slow burn. |
 | `monitoring.slos.<id>.annotations` | object |  | Annotations on the ServiceLevelObjective. |
@@ -1535,3 +1543,10 @@ retries, and the drop hook depended on the class at teardown. The preview
 database Jobs now honour `defaultPodOptions.priorityClassName`, as documented.
 Image bumps no longer touch the snapshots (chart-default tags render as
 `__DEFAULT_TAG__`).
+
+### 0.13.0
+
+Every release now gets a PodMonitor scraping `/metrics` on port `9090` of its
+`main` pods (`monitoring.metrics`), and declares that port on their `main`
+container. An app that serves no metrics there sets
+`monitoring.metrics.enabled: false`, or its target shows as down.

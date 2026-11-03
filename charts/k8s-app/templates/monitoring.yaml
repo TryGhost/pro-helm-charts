@@ -1,4 +1,9 @@
 {{- /*
+monitoring.metrics -> one PodMonitor `<release>` scraping metrics.port on the
+pods of the listed controllers, labelled release=kube-prometheus-stack so that
+Prometheus's podMonitorSelector selects it. A PodMonitor rather than a
+ServiceMonitor, so the metrics port needs no Service port; the chart declares
+it on the container instead (_metrics.tpl).
 monitoring.alerts -> one PrometheusRule `<release>-alerts` holding one rule
 group named after the release, one alerting rule per key (the key is the
 alert name). monitoring.slos -> one Pyrra ServiceLevelObjective
@@ -12,6 +17,32 @@ expr and annotations are emitted verbatim, so Prometheus templating
 ({{ $labels.x }}, {{ $value }}) passes through untouched.
 */ -}}
 {{- if not .Values.preview.prNumber }}
+{{- with .Values.monitoring.metrics }}
+{{- if .enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ $.Release.Name }}
+  labels:
+    {{- include "k8s-app.labels" $ | nindent 4 }}
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ default $.Release.Name ($.Values.global | default dict).nameOverride }}
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+    matchExpressions:
+      - key: app.kubernetes.io/controller
+        operator: In
+        values:
+          {{- toYaml .controllers | nindent 10 }}
+  podMetricsEndpoints:
+    - portNumber: {{ .port }}
+      path: {{ .path | quote }}
+      interval: {{ .interval }}
+{{- end }}
+{{- end }}
 {{- $rules := list }}
 {{- range $alert, $rule := .Values.monitoring.alerts }}
 {{- if dig "enabled" true $rule }}

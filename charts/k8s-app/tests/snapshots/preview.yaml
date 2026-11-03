@@ -215,6 +215,10 @@ spec:
               port: 3000
             periodSeconds: 15
           name: main
+          ports:
+            - containerPort: 9090
+              name: metrics
+              protocol: TCP
           readinessProbe:
             httpGet:
               path: /readyz

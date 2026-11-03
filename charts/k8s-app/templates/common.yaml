@@ -54,6 +54,10 @@ containers it adds do not. */ -}}
 
 {{- $_ := mergeOverwrite .Values (include "k8s-app.controllerDefaults.values" . | fromYaml) -}}
 
+{{- if .Values.monitoring.metrics.enabled }}
+{{- $_ := mergeOverwrite .Values (include "k8s-app.metrics.values" . | fromYaml) -}}
+{{- end }}
+
 {{- /* A dedicated Gateway is a DO load balancer per release: refuse it on
 per-PR preview releases before filling each route's parentRefs. */ -}}
 {{- if and .Values.preview.prNumber (ne (include "k8s-app.gateway.dedicatedNetworks" .) "[]") -}}

@@ -101,6 +101,10 @@ spec:
               port: 3000
             periodSeconds: 15
           name: main
+          ports:
+            - containerPort: 9090
+              name: metrics
+              protocol: TCP
           readinessProbe:
             httpGet:
               path: /readyz
@@ -319,6 +323,30 @@ spec:
                 name: myapp
           image: registry.digitalocean.com/ghost/myapp:__IMAGE_SHA__
           name: main
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: myapp
+  labels:
+    app.kubernetes.io/name: myapp
+    app.kubernetes.io/instance: myapp
+    app.kubernetes.io/managed-by: Helm
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: myapp
+      app.kubernetes.io/instance: myapp
+    matchExpressions:
+      - key: app.kubernetes.io/controller
+        operator: In
+        values:
+          - main
+  podMetricsEndpoints:
+    - portNumber: 9090
+      path: "/metrics"
+      interval: 30s
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
