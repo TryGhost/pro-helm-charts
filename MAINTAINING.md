@@ -72,7 +72,7 @@ that already have a GitHub release.
 
 Merging to `main` with a chart change runs `.github/workflows/release.yaml`:
 validate, `helm dependency build` (bundling the locked common), `helm
-package`, `gh release create k8s-app-<version>` with the `.tgz` attached
+package`, `gh release create <chart>-<version>` with the `.tgz` attached
 (assets are uploaded at creation, which is what immutable releases require and
 why chart-releaser is not used), and `helm repo index --merge` into
 `index.yaml` on `gh-pages`, pointing at the release asset. Old entries are
@@ -82,8 +82,9 @@ Repository settings this relies on:
 
 - Public repository (GitHub Pages), Pages served from `gh-pages` / root.
 - A ruleset on `main` requiring the `Lint and render`, `Lint and render raw`
-  and `Chart version bumped` checks and a review. Without it the version-bump rule is advisory:
-  direct pushes to `main` skip the PR-only check.
+  and `Chart version bumped` checks and a review. Without it the
+  version-bump rule is advisory: direct pushes to `main` skip the PR-only
+  check.
 - Renovate installed on the repository.
 
 ## Renovate

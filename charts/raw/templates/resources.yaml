@@ -2,7 +2,7 @@
 {{- if not (kindIs "map" $r) }}
 {{- fail (printf "resources[%d] must be a manifest (a map), got %s" $i (kindOf $r)) }}
 {{- end }}
-{{- if not (and $r.apiVersion $r.kind (dig "metadata" "name" "" $r)) }}
+{{- if not (and $r.apiVersion $r.kind (kindIs "map" $r.metadata) $r.metadata.name) }}
 {{- fail (printf "resources[%d] needs apiVersion, kind and metadata.name" $i) }}
 {{- end }}
 ---
