@@ -216,6 +216,10 @@ jobs:
           in='{"resources":[{"apiVersion":"v1","kind":"Namespace","metadata":{"name":"a"}},{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"b","namespace":"a"},"data":{"k":"v"}}]}'
           out=$(echo "$in" | helm template t charts/raw -f - | yq -o=json -I=0 '.' | jq -Ssc .)
           [ "$out" = "$(echo "$in" | jq -Sc .resources)" ]
+          # entries that aren't complete manifests fail the render
+          for bad in '[null]' '["x"]' '[{}]' '[{"apiVersion":"v1","kind":"Namespace"}]'; do
+            ! echo "{\"resources\":$bad}" | helm template t charts/raw -f - >/dev/null 2>&1 || exit 1
+          done
 
   version-bump:
     name: Chart version bumped
