@@ -96,3 +96,11 @@ monitoring:
             metric: http_requests_total{namespace="myapp",code=~"5.."}
           total:
             metric: http_requests_total{namespace="myapp"}
+
+# The namespace is network-sandboxed: private destinations are declared here.
+# Environments add their own, e.g. the database host in values.production.yaml.
+# A preview renders no policy: its pods use the staging release's.
+network:
+  allow:
+    logs:
+      preset: elastic

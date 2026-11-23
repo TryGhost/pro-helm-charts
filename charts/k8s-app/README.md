@@ -38,7 +38,9 @@ Contents
 - [k8s-app: migrations `migrations`](#k8s-app-migrations-migrations)
 - [k8s-app: hot reload `hotReload`](#k8s-app-hot-reload-hotreload)
 - [k8s-app: preview database `previewDatabase`](#k8s-app-preview-database-previewdatabase)
+- [k8s-app: gateways `gateway`](#k8s-app-gateways-gateway)
 - [k8s-app: monitoring `monitoring`](#k8s-app-monitoring-monitoring)
+- [k8s-app: network access `network`](#k8s-app-network-access-network)
 - [k8s-app: defaults applied to every release](#k8s-app-defaults-applied-to-every-release)
 - [Upgrading](#upgrading)
 
@@ -1418,6 +1420,74 @@ monitoring:
 | `monitoring.slos.<id>.labels` | object |  | Extra labels on the ServiceLevelObjective. Pyrra copies labels prefixed pyrra.dev/ (prefix stripped) onto the alerts it generates, e.g. pyrra.dev/team (set severity through alerting.severities). |
 | `monitoring.slos.<id>.target` | string / number |  | Objective in percent, e.g. "99.9". |
 | `monitoring.slos.<id>.window` | string | `"4w"` | Rolling window the objective is measured over. |
+<!-- /values -->
+
+## k8s-app: network access `network`
+
+App namespaces are network-sandboxed: a pod receives traffic only from the
+Gateways, kubelet probes and Prometheus, and reaches only cluster DNS and the
+public internet. Declare every private destination the app needs under
+`network.allow`:
+
+```yaml
+network:
+  allow:
+    logs:
+      preset: elastic
+    database:
+      host: private-myapp-db.a.db.ondigitalocean.com
+      ports: [25060]
+    redis:
+      ip: 10.133.0.12
+      ports: [6379, 26379]
+```
+
+- Each entry is exactly one of `preset`, `host` + `ports` or `ip` + `ports`.
+  The key is a name of your choosing. TCP only.
+- `preset`: a destination the platform maintains. `elastic` is the logging
+  cluster (9200 and 443), `sitesdbs` the site database shards (3306).
+- `host`: an exact lowercase hostname outside the cluster, no wildcards.
+  Prefer it to `ip` for managed databases, whose private IPs can change.
+- `ip`: one IPv4 address, for a droplet with no stable DNS name.
+- The entries render into one CiliumNetworkPolicy `<release>-network-allow`
+  that applies to every pod in the namespace. It is applied at sync wave
+  -10, before the migrations Job that needs it.
+- Keyed map, so a `values.<env>.yaml` can add, change or disable a single
+  entry. Helm merges an entry key by key, so:
+  - `enabled: false` or `<name>: null` drops an inherited entry;
+  - changing a port or a host is a plain override;
+  - changing what kind an entry is means clearing the old key, or the
+    entry ends up with two destinations and is rejected:
+
+    ```yaml
+    network:
+      allow:
+        logs:
+          preset: null
+          host: es.example.com
+          ports: [9200]
+    ```
+- A preview renders no policy, whatever its values say. It shares the
+  namespace with the staging release, whose policy already covers its pods
+  and its preview database Jobs; a policy of its own would let an open PR
+  widen staging's sandbox. So a new destination reaches previews once it is
+  deployed to staging, and an app whose first release is a preview has no
+  private egress until staging is deployed.
+- It can't express: another app's pods, the Kubernetes API, or anything
+  inbound. Those need a platform change in
+  [TryGhost/k8s](https://github.com/TryGhost/k8s) `cluster-addons/network-sandbox`.
+- A new destination takes effect up to a minute after the deploy.
+
+<!-- values: network -->
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `network` | object |  | Network: the private destinations the app's pods may reach. App namespaces are network-sandboxed, so without an entry here pods reach only cluster DNS and the public internet. |
+| `network.allow` | object | `{}` | Egress allowed for every pod in the namespace, keyed by a name of your choosing, rendered into one CiliumNetworkPolicy <release>-network-allow. Each entry is exactly one of preset, host or ip. Keyed so an environment can add, change or disable a single entry: null removes an inherited entry, and a null key (preset: null) clears it when an entry changes kind. |
+| `network.allow.<id>.enabled` | boolean | `true` | Render this entry. An entry with enabled: false needs no destination. |
+| `network.allow.<id>.host` | string / null |  | Exact lowercase hostname outside the cluster, e.g. a managed database's private host. No wildcards, no in-cluster (.svc, .cluster.local) names. Needs ports. |
+| `network.allow.<id>.ip` | string / null |  | A single IPv4 address, e.g. a droplet's private IP. Not link-local (169.254.0.0/16). Needs ports. |
+| `network.allow.<id>.ports` | array / null |  | TCP ports to open on the destination. |
+| `network.allow.<id>.preset` | string / null (elastic, sitesdbs, null) |  | A destination the platform maintains: elastic (the logging cluster, 9200 and 443) or sitesdbs (the site database shards, 3306). Takes no ports. |
 <!-- /values -->
 
 ## k8s-app: defaults applied to every release

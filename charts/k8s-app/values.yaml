@@ -238,3 +238,14 @@ monitoring:
   # description, alerting, labels, annotations, enabled. Requires Pyrra in
   # the cluster.
   slos: {}
+
+# -- Network. App namespaces are sandboxed: pods reach only cluster DNS and
+# the public internet. Private destinations are declared here.
+network:
+  # -- Egress the app needs, keyed by a name of your choosing, rendered into
+  # one CiliumNetworkPolicy `<release>-network-allow` for every pod in the
+  # namespace. Each entry is one of: `preset` (elastic, sitesdbs), `host` +
+  # `ports`, or `ip` + `ports`. TCP only. `enabled: false` drops an entry,
+  # and so does `<name>: null`.
+  # A preview renders no policy: its pods use the staging release's.
+  allow: {}

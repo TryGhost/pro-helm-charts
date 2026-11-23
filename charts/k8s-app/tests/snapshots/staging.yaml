@@ -1,3 +1,43 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: myapp-network-allow
+  labels:
+    app.kubernetes.io/name: myapp
+    app.kubernetes.io/instance: myapp
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  endpointSelector: {}
+  enableDefaultDeny:
+    egress: false
+    ingress: false
+  egress:
+    - toFQDNs:
+        - matchName: private-myapp-stg-db.b.db.ondigitalocean.com
+      toPorts:
+        - ports:
+            - port: "25060"
+              protocol: TCP
+    - toFQDNs:
+        - matchName: elastic-backend-internal.ghost.org
+        - matchName: elastic-backend-internal.ghostfoundation.org
+      toPorts:
+        - ports:
+            - port: "9200"
+              protocol: TCP
+            - port: "443"
+              protocol: TCP
+    - toPorts:
+        - ports:
+            - port: "3306"
+              protocol: TCP
+      toServices:
+        - k8sService:
+            namespace: sitesdbs
+            serviceName: sitesdbs
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
