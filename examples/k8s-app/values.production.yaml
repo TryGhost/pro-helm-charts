@@ -19,3 +19,12 @@ route:
   main:
     hostnames:
       - myapp.ghostinfra.com
+
+network:
+  allow:
+    database:
+      host: private-myapp-db.a.db.ondigitalocean.com
+      ports: [25060]
+    redis:
+      ip: 10.133.0.12
+      ports: [6379, 26379]

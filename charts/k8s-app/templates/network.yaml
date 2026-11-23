@@ -1,0 +1,72 @@
+{{- /*
+network.allow -> one CiliumNetworkPolicy `<release>-network-allow` opening
+egress from every pod in the namespace to the listed destinations. App
+namespaces are network-sandboxed (TryGhost/k8s, cluster-addons/network-sandbox):
+pods reach only cluster DNS and the public internet unless an entry here says
+otherwise. Egress only, and only to a host, an IP or a preset, so an app can't
+open itself to other workloads; gitops-sync rejects any other policy.
+
+enableDefaultDeny is off because the policy only adds allows: without it,
+selecting the pods would itself isolate them where the sandbox isn't enforced.
+Hostname rules rely on the sandbox's own DNS proxy rule. Keyed map so a
+values.<env>.yaml can add, change or disable (`enabled: false`) one entry; a
+null entry or key is how a values file unsets an inherited one, so both are
+skipped here.
+
+Wave -10: the migrations Job (-1) connects to the destinations, and a failing
+Job would stop the sync before a wave-0 policy that unblocks it.
+
+A preview renders none. It shares its namespace with the staging release, and
+the policy selects every pod there, so an open PR would widen staging's
+sandbox; gitops-sync fails a preview render that has one. Preview pods and the
+preview database Jobs are covered by the staging release's policy, which is
+also still there when the PostDelete drop-preview-db hook runs.
+*/ -}}
+{{- $presets := dict
+  "elastic" (list (dict
+    "toFQDNs" (list (dict "matchName" "elastic-backend-internal.ghost.org") (dict "matchName" "elastic-backend-internal.ghostfoundation.org"))
+    "ports" (list 9200 443)))
+  "sitesdbs" (list (dict
+    "toServices" (list (dict "k8sService" (dict "serviceName" "sitesdbs" "namespace" "sitesdbs")))
+    "ports" (list 3306)))
+}}
+{{- $egress := list }}
+{{- range $name, $entry := dig "allow" dict (.Values.network | default dict) }}
+{{- if $entry }}
+{{- if dig "enabled" true $entry }}
+{{- $rules := list }}
+{{- if $entry.preset }}
+{{- $rules = get $presets $entry.preset }}
+{{- else if $entry.host }}
+{{- $rules = list (dict "toFQDNs" (list (dict "matchName" $entry.host)) "ports" $entry.ports) }}
+{{- else }}
+{{- $rules = list (dict "toCIDR" (list (printf "%s/32" $entry.ip)) "ports" $entry.ports) }}
+{{- end }}
+{{- range $rule := $rules }}
+{{- $ports := list }}
+{{- range $port := $rule.ports }}
+{{- $ports = append $ports (dict "port" (toString $port) "protocol" "TCP") }}
+{{- end }}
+{{- $egress = append $egress (merge (dict "toPorts" (list (dict "ports" $ports))) (omit $rule "ports")) }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if and $egress (not .Values.preview.prNumber) }}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-network-allow
+  labels:
+    {{- include "k8s-app.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  endpointSelector: {}
+  enableDefaultDeny:
+    egress: false
+    ingress: false
+  egress:
+    {{- toYaml $egress | nindent 4 }}
+{{- end }}

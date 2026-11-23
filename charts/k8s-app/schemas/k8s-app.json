@@ -714,6 +714,217 @@
       }
     }
   },
+  "network": {
+    "description": "Network: the private destinations the app's pods may reach. App namespaces are network-sandboxed, so without an entry here pods reach only cluster DNS and the public internet.",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "allow": {
+        "description": "Egress allowed for every pod in the namespace, keyed by a name of your choosing, rendered into one CiliumNetworkPolicy <release>-network-allow. Each entry is exactly one of preset, host or ip. Keyed so an environment can add, change or disable a single entry: null removes an inherited entry, and a null key (preset: null) clears it when an entry changes kind.",
+        "type": "object",
+        "default": {},
+        "propertyNames": {
+          "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
+        },
+        "additionalProperties": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "description": "Render this entry. An entry with enabled: false needs no destination.",
+              "type": "boolean",
+              "default": true
+            },
+            "preset": {
+              "description": "A destination the platform maintains: elastic (the logging cluster, 9200 and 443) or sitesdbs (the site database shards, 3306). Takes no ports.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "elastic",
+                "sitesdbs",
+                null
+              ]
+            },
+            "host": {
+              "description": "Exact lowercase hostname outside the cluster, e.g. a managed database's private host. No wildcards, no in-cluster (.svc, .cluster.local) names. Needs ports.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^([a-z0-9]([a-z0-9-]*[a-z0-9])?\\.)+([a-z]{2,}|xn--[a-z0-9-]*[a-z0-9])$",
+              "not": {
+                "pattern": "\\.(svc|cluster\\.local)$"
+              }
+            },
+            "ip": {
+              "description": "A single IPv4 address, e.g. a droplet's private IP. Not link-local (169.254.0.0/16). Needs ports.",
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$",
+              "not": {
+                "pattern": "^(0\\.0\\.0\\.0$|169\\.254\\.)"
+              }
+            },
+            "ports": {
+              "description": "TCP ports to open on the destination.",
+              "type": [
+                "array",
+                "null"
+              ],
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              }
+            }
+          },
+          "if": {
+            "required": [
+              "enabled"
+            ],
+            "properties": {
+              "enabled": {
+                "const": false
+              }
+            }
+          },
+          "else": {
+            "oneOf": [
+              {
+                "required": [
+                  "preset"
+                ],
+                "properties": {
+                  "preset": {
+                    "type": "string"
+                  }
+                },
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "host"
+                      ],
+                      "properties": {
+                        "host": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    {
+                      "required": [
+                        "ip"
+                      ],
+                      "properties": {
+                        "ip": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    {
+                      "required": [
+                        "ports"
+                      ],
+                      "properties": {
+                        "ports": {
+                          "type": "array"
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "host",
+                  "ports"
+                ],
+                "properties": {
+                  "host": {
+                    "type": "string"
+                  },
+                  "ports": {
+                    "type": "array"
+                  }
+                },
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "preset"
+                      ],
+                      "properties": {
+                        "preset": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    {
+                      "required": [
+                        "ip"
+                      ],
+                      "properties": {
+                        "ip": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "ip",
+                  "ports"
+                ],
+                "properties": {
+                  "ip": {
+                    "type": "string"
+                  },
+                  "ports": {
+                    "type": "array"
+                  }
+                },
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "preset"
+                      ],
+                      "properties": {
+                        "preset": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    {
+                      "required": [
+                        "host"
+                      ],
+                      "properties": {
+                        "host": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
   "x-route-extensions": {
     "gateway": {
       "description": "Which gateway this route attaches to when parentRefs is not set: shared-internal (default), shared-external, dedicated-internal or dedicated-external. dedicated-* renders a per-app Gateway (its own DO load balancer) with certificate and HTTP->HTTPS redirect.",

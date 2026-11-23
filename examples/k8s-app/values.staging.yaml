@@ -32,3 +32,11 @@ monitoring:
           fastBurn: warning
           mediumBurn: warning
           absent: warning
+
+network:
+  allow:
+    database:
+      host: private-myapp-stg-db.b.db.ondigitalocean.com
+      ports: [25060]
+    sites:
+      preset: sitesdbs

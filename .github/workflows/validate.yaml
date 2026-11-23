@@ -67,6 +67,26 @@ jobs:
           ! helm template t "$CHART" $base --set migrations.backoffLimit=-1 || exit 1
           ! helm template t "$CHART" $base --set migrations.enabled=true --set migrations.command=null || exit 1   # command is required
           ! helm template t "$CHART" $base --set migrations.container=nope || exit 1   # unknown container
+          ! helm template t "$CHART" $base --set network.bogus=1 || exit 1
+          ! helm template t "$CHART" $base --set network.allow.x.host=db.example.com || exit 1  # ports are required
+          ! helm template t "$CHART" $base --set network.allow.x.preset=nope || exit 1
+          ! helm template t "$CHART" $base --set network.allow.x.preset=elastic --set 'network.allow.x.ports={443}' || exit 1  # a preset takes no ports
+          ! helm template t "$CHART" $base --set network.allow.x.host=db.example.com --set-string network.allow.x.ip=10.0.0.1 --set 'network.allow.x.ports={443}' || exit 1  # one destination per entry
+          ! helm template t "$CHART" $base --set-string 'network.allow.x.host=*.example.com' --set 'network.allow.x.ports={443}' || exit 1  # no wildcards
+          ! helm template t "$CHART" $base --set-string network.allow.x.ip=10.0.0.0/8 --set 'network.allow.x.ports={443}' || exit 1  # one address, not a range
+          ! helm template t "$CHART" $base --set-string network.allow.x.ip=10.133.00.12 --set 'network.allow.x.ports={443}' || exit 1  # Cilium rejects a CIDR with leading zeros
+          ! helm template t "$CHART" $base --set-string network.allow.x.ip=0.0.0.0 --set 'network.allow.x.ports={443}' || exit 1
+          ! helm template t "$CHART" $base --set-string network.allow.x.ip=169.254.169.254 --set 'network.allow.x.ports={80}' || exit 1  # link-local: the droplet metadata service
+          ! helm template t "$CHART" $base --set network.allow.x.host=api.other.svc.cluster.local --set 'network.allow.x.ports={443}' || exit 1  # toFQDNs never matches an in-cluster name
+          ! helm template t "$CHART" $base --set network.allow.x.host=DB.example.com --set 'network.allow.x.ports={443}' || exit 1
+          helm template t "$CHART" $base --set network.allow.x.host=db.xn--p1ai --set 'network.allow.x.ports={443}' >/dev/null  # punycode TLD
+          ! helm template t "$CHART" $base --set network.allow.logs.host=es.example.com --set 'network.allow.logs.ports={9200}' || exit 1  # base's preset is still set
+          helm template t "$CHART" $base --set network.allow.logs.preset=null --set network.allow.logs.host=es.example.com --set 'network.allow.logs.ports={9200}' | grep -q 'matchName: es.example.com'  # an entry changes kind by clearing the old key
+          helm template t "$CHART" $base --set network.allow.x.enabled=false >/dev/null  # a disabled entry needs no destination
+          for unset in network.allow.logs.enabled=false network.allow.logs=null network.allow=null network=null; do
+            out=$(helm template t "$CHART" $base --set "$unset")
+            ! grep -q 'kind: CiliumNetworkPolicy' <<<"$out" || exit 1  # base's only entry is gone, and so is the policy
+          done
           ! helm template t "$CHART" $base --set monitoring.bogus=1 || exit 1
           ! helm template t "$CHART" $base --set monitoring.alerts.X.expr=up --set monitoring.alerts.X.for=5x || exit 1  # not a duration
           ! helm template t "$CHART" $base --set monitoring.alerts.X.expr=up --set monitoring.alerts.X.for=5m1h || exit 1  # units out of order
@@ -135,12 +155,22 @@ jobs:
           [ "$(yq 'select(.kind=="Deployment") | .metadata.name' "$r/staging.yaml")" = "myapp" ]
           [ "$(yq 'select(.kind=="Deployment") | .metadata.name' "$r/preview.yaml")" = "myapp" ]
           [ "$(yq -r 'select(.kind=="ConfigMap") | .metadata.name' "$r/preview.yaml" | grep -v '^---$' | sort | head -1)" = "myapp" ]
-          echo "sync waves order the release: secrets -10, config -3, preview database -2, migrations -1, workloads 0"
+          echo "sync waves order the release: secrets and network policy -10, config -3, preview database -2, migrations -1, workloads 0"
+          for env in staging production; do
+            [ "$(yq 'select(.kind=="CiliumNetworkPolicy") | .metadata.annotations["argocd.argoproj.io/sync-wave"]' "$r/$env.yaml")" = "-10" ]
+          done
           [ "$(yq -r 'select(.kind=="ConfigMap" or .kind=="ServiceAccount") | .metadata.annotations["argocd.argoproj.io/sync-wave"]' "$r/preview.yaml" | grep -v '^---$' | sort -u)" = "-3" ]
           [ "$(yq -r 'select(.kind=="ExternalSecret") | .metadata.annotations["argocd.argoproj.io/sync-wave"]' "$r/preview.yaml" | grep -v '^---$' | sort -u)" = "-10" ]
           [ "$(yq 'select(.kind=="Job" and .metadata.name=="myapp-create-preview-db") | .metadata.annotations["argocd.argoproj.io/sync-wave"]' "$r/preview.yaml")" = "-2" ]
           [ "$(yq 'select(.kind=="Job" and .metadata.name=="myapp-migrations") | .metadata.annotations["argocd.argoproj.io/sync-wave"]' "$r/preview.yaml")" = "-1" ]
           [ "$(yq 'select(.kind=="Deployment") | .metadata.annotations["argocd.argoproj.io/sync-wave"] // "unset"' "$r/preview.yaml")" = "unset" ]
+          echo "a preview never renders the network policy: it would widen the namespace it shares with staging"
+          ! grep -q 'kind: CiliumNetworkPolicy' "$r/preview.yaml" || exit 1
+          ! helm template myapp-123 "$CHART" -n myapp -f "$EX/values.base.yaml" -f "$EX/values.preview.yaml" --set preview.prNumber=123 \
+              --set network.allow.x.host=db.example.com --set 'network.allow.x.ports={443}' | grep -q 'kind: CiliumNetworkPolicy' || exit 1
+          for env in staging production; do
+            [ "$(yq -r 'select(.kind=="CiliumNetworkPolicy") | .metadata.name' "$r/$env.yaml")" = "myapp-network-allow" ]
+          done
           echo "the credentials never reach the git-sync containers"
           for c in git-sync git-sync-init; do
             [ "$(yq "select(.kind==\"Deployment\") | [.spec.template.spec.containers[], .spec.template.spec.initContainers[]] | .[] | select(.name==\"$c\") | .env[].name | select(test(\"__connection__\"))" "$r/preview.yaml")" = "" ]
